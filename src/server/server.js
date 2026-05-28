@@ -12,6 +12,7 @@ const ANTHROPIC_API_KEY =
 const OPEN_AI_API_KEY =
   "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";
 
+/**
 //-------------- CONFIGURATION --------------//
 // Claude API
 const Anthropic = require("@anthropic-ai/sdk");
@@ -164,6 +165,7 @@ async function uploadAPKToDraft(appId, aabPath, serviceAccount) {
   });
 }
 //-------------- FIN CONFIGURATION --------------//
+*/
 
 async function callClaude(systemPrompt, userMessage) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
