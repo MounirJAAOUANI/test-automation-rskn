@@ -1,5 +1,7 @@
+import fs from "fs";
 import express from "express";
 import cors from "cors";
+import https from "https";
 
 const app = express();
 
@@ -226,16 +228,17 @@ app.post("/chat", async (req, res) => {
     console.info("result : ", result);
 
     res.json({ text: result });
-
-    // const parsed = JSON.parse(rawText);
-
-    // res.json(parsed);
   } catch (e) {
     console.error("BACKEND ERROR:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
-app.listen(3000, () => {
+const options = {
+  key: fs.readFileSync("./key.pem"),
+  cert: fs.readFileSync("./cert.pem"),
+};
+
+https.createServer(options, app).listen(3000, () => {
   console.log("Server running on http://localhost:3000");
 });
