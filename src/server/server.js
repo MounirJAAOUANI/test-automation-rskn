@@ -1,7 +1,7 @@
 import fs from "fs";
 import express from "express";
 import cors from "cors";
-import https from "https";
+import http2 from "http2";
 
 const app = express();
 
@@ -239,6 +239,6 @@ const options = {
   cert: fs.readFileSync("./cert.pem"),
 };
 
-https.createServer(options, app).listen(3000, () => {
+http2.createSecureServer(options, app).listen(3000, () => {
   console.log("Server running on http://localhost:3000");
 });
