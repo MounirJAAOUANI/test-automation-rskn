@@ -4,7 +4,7 @@
  * pour afficher les logs en temps réel.
  */
 
-const BASE = "/api";
+const BASE = import.meta.env.VITE_API_URL || "/api";
 
 /**
  * Lance un agent via SSE.
@@ -19,9 +19,9 @@ export async function runAgent(agentId, payload, onLog, onDone, onError) {
 
   try {
     response = await fetch(`${BASE}/agents/${agentId}`, {
-      method:  "POST",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(payload),
+      body: JSON.stringify(payload),
     });
   } catch (err) {
     onError({ msg: "Serveur inaccessible", detail: err.message });
@@ -35,9 +35,9 @@ export async function runAgent(agentId, payload, onLog, onDone, onError) {
   }
 
   // ─── Lecture SSE depuis le body stream ──────────────────────────────────
-  const reader  = response.body.getReader();
+  const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let   buffer  = "";
+  let buffer = "";
 
   while (true) {
     let chunk;
@@ -69,9 +69,15 @@ export async function runAgent(agentId, payload, onLog, onDone, onError) {
         continue;
       }
 
-      if (event.event === "log")   onLog(event);
-      if (event.event === "done")  { onDone(event.data); return; }
-      if (event.event === "error") { onError(event);     return; }
+      if (event.event === "log") onLog(event);
+      if (event.event === "done") {
+        onDone(event.data);
+        return;
+      }
+      if (event.event === "error") {
+        onError(event);
+        return;
+      }
     }
   }
 }
@@ -82,7 +88,7 @@ export async function runAgent(agentId, payload, onLog, onDone, onError) {
  */
 export async function healthCheck() {
   try {
-    const res  = await fetch(`${BASE}/health`);
+    const res = await fetch(`${BASE}/health`);
     return res.ok ? res.json() : null;
   } catch {
     return null;
