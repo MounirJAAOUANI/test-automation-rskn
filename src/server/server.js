@@ -1,7 +1,7 @@
-import fs from "fs";
+// import fs from "fs";
 import express from "express";
 import cors from "cors";
-import http2 from "http2";
+// import http2 from "http2";
 
 const app = express();
 
@@ -169,7 +169,7 @@ async function uploadAPKToDraft(appId, aabPath, serviceAccount) {
 //-------------- FIN CONFIGURATION --------------//
 */
 
-async function callClaude(systemPrompt, userMessage) {
+async function callClaude(niche) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -180,12 +180,13 @@ async function callClaude(systemPrompt, userMessage) {
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001", //"claude-sonnet-4-5-20250929",
       max_tokens: 1000,
-      //   temperature: 1,
-      system: systemPrompt,
+      system: `Tu es un expert en analyse de marché Play Store.
+        Réponds UNIQUEMENT en JSON valide, sans markdown, sans commentaires.
+        Le JSON doit être parseable directement par JSON.parse().`,
       messages: [
         {
           role: "user",
-          content: userMessage,
+          content: niche,
         },
       ],
       temperature: 1,
@@ -221,9 +222,9 @@ async function callClaude(systemPrompt, userMessage) {
 app.post("/chat", async (req, res) => {
   try {
     console.log("REQ BODY:", req.body);
-    const { systemPrompt, message } = req.body;
+    const { niche } = req.body;
 
-    const result = await callClaude(systemPrompt, message);
+    const result = await callClaude(niche);
 
     console.info("result : ", result);
 
@@ -234,11 +235,11 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-const options = {
-  key: fs.readFileSync("./key.pem"),
-  cert: fs.readFileSync("./cert.pem"),
-};
+// const options = {
+//   key: fs.readFileSync("./key.pem"),
+//   cert: fs.readFileSync("./cert.pem"),
+// };
 
-http2.createSecureServer(options, app).listen(3000, () => {
+app.listen(3000, () => {
   console.log("Server running on http://localhost:3000");
 });
