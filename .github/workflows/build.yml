@@ -1,0 +1,20 @@
+name: Build Flutter
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:      { required: true, type: string }
+      package_id:    { required: true, type: string }
+      primary_color: { required: false, type: string, default: '#7C3AED' }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: '3.22.0' }
+      - run: flutter pub get
+      - run: flutter build appbundle --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release.aab
+          path: build/app/outputs/bundle/release/app-release.aab
