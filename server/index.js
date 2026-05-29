@@ -4,19 +4,19 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 
-const claudeLib   = require("./lib/claude");
-const openaiLib   = require("./lib/openai");
+const claudeLib = require("./lib/claude");
+const openaiLib = require("./lib/openai");
 const playstoreLib = require("./lib/playstore");
 const firebaseLib = require("./lib/firebase");
-const githubLib   = require("./lib/github");
+const githubLib = require("./lib/github");
 
-const app  = express();
+const app = express();
 const PORT = process.env.PORT || 4000;
 
 // ─── ENV ────────────────────────────────────────────────────────────────────
-const MODE_ENV  = (process.env.MODE_ENV  || "development").toLowerCase();
+const MODE_ENV = (process.env.MODE_ENV || "development").toLowerCase();
 const MOT_DEBUG = (process.env.MOT_DEBUG || "false").toLowerCase() === "true";
-const IS_PROD   = MODE_ENV === "production";
+const IS_PROD = MODE_ENV === "production";
 
 // ─── CORS ───────────────────────────────────────────────────────────────────
 const allowedOrigins = [
@@ -25,14 +25,16 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-    cb(new Error(`CORS: origin ${origin} not allowed`));
-  },
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      cb(new Error(`CORS: origin ${origin} not allowed`));
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 app.options("*", cors());
 app.use(express.json({ limit: "10mb" }));
 
@@ -43,9 +45,9 @@ app.use(express.json({ limit: "10mb" }));
  */
 function createSSE(res) {
   res.writeHead(200, {
-    "Content-Type":  "text/event-stream",
+    "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
-    "Connection":    "keep-alive",
+    Connection: "keep-alive",
     "X-Accel-Buffering": "no",
   });
   res.flushHeaders();
@@ -56,14 +58,21 @@ function createSSE(res) {
 
   return {
     log(msg, type = "info") {
-      send({ event: "log", type, msg, ts: new Date().toLocaleTimeString("fr-FR") });
+      send({
+        event: "log",
+        type,
+        msg,
+        ts: new Date().toLocaleTimeString("fr-FR"),
+      });
     },
     done(data) {
       send({ event: "done", data });
       res.end();
     },
     fail(err) {
-      const detail = MOT_DEBUG ? (err?.stack || String(err)) : err?.message || "Erreur interne";
+      const detail = MOT_DEBUG
+        ? err?.stack || String(err)
+        : err?.message || "Erreur interne";
       send({ event: "error", msg: err?.message || "Erreur", detail });
       res.end();
     },
@@ -77,7 +86,7 @@ app.get("/api/health", (_req, res) => {
 
 // ─── AGENT: MARKET SCOUT ────────────────────────────────────────────────────
 app.post("/api/agents/market-scout", async (req, res) => {
-  const sse  = createSSE(res);
+  const sse = createSSE(res);
   const { niche } = req.body;
 
   if (!IS_PROD) {
@@ -96,7 +105,10 @@ app.post("/api/agents/market-scout", async (req, res) => {
 
     sse.log("Calcul saturation + score moyen...");
     const stats = playstoreLib.analyze(apps);
-    sse.log(`Saturation: ${stats.saturationLevel} | Score moy: ${stats.avgScore}/5`, "data");
+    sse.log(
+      `Saturation: ${stats.saturationLevel} | Score moy: ${stats.avgScore}/5`,
+      "data",
+    );
 
     sse.log("Analyse sémantique via Claude Haiku...");
     const analysis = await claudeLib.analyzeNiche(niche, apps.slice(0, 10));
@@ -138,7 +150,10 @@ app.post("/api/agents/app-architect", async (req, res) => {
     sse.log("Génération nom + package ID via Claude...");
     const result = await claudeLib.generateArchitecture(niche, marketData);
     sse.log(`Nom: ${result.appName} | Package: ${result.packageId}`, "success");
-    sse.log(`Thème: ${result.theme.primaryColor} | ${result.screens.length} écrans`, "data");
+    sse.log(
+      `Thème: ${result.theme.primaryColor} | ${result.screens.length} écrans`,
+      "data",
+    );
     sse.done(result);
   } catch (err) {
     sse.fail(err);
@@ -158,7 +173,11 @@ app.post("/api/agents/logo-gen", async (req, res) => {
 
   try {
     sse.log("Génération prompt logo (Claude)...");
-    const prompt = await claudeLib.generateLogoPrompt(appName, niche, primaryColor);
+    const prompt = await claudeLib.generateLogoPrompt(
+      appName,
+      niche,
+      primaryColor,
+    );
     sse.log(`Prompt: "${prompt.substring(0, 60)}..."`, "data");
 
     sse.log("Appel OpenAI GPT Image 2 Standard ($0.011)...");
@@ -208,9 +227,16 @@ app.post("/api/agents/code-gen", async (req, res) => {
     }
 
     sse.log("Génération code via Claude Haiku...");
-    const code = await claudeLib.generateFlutterCode(appName, packageId, architecture);
+    const code = await claudeLib.generateFlutterCode(
+      appName,
+      packageId,
+      architecture,
+    );
     sse.log(`${Object.keys(code.files).length} fichiers générés`, "success");
-    sse.log("Firebase Remote Config configuré — IDs AdMob externalisés ✅", "data");
+    sse.log(
+      "Firebase Remote Config configuré — IDs AdMob externalisés ✅",
+      "data",
+    );
 
     sse.done(code);
   } catch (err) {
@@ -226,7 +252,15 @@ app.post("/api/agents/screenshots", async (req, res) => {
   if (!IS_PROD) {
     sse.log("[DEV] Mode simulation — pas de Puppeteer");
     await delay(1000);
-    return sse.done({ screenshots: Array(5).fill(null).map((_, i) => ({ index: i + 1, path: `screenshot_${i + 1}.png`, size: "1440x3120" })) });
+    return sse.done({
+      screenshots: Array(5)
+        .fill(null)
+        .map((_, i) => ({
+          index: i + 1,
+          path: `screenshot_${i + 1}.png`,
+          size: "1440x3120",
+        })),
+    });
   }
 
   try {
@@ -235,7 +269,9 @@ app.post("/api/agents/screenshots", async (req, res) => {
     try {
       puppeteer = require("puppeteer");
     } catch {
-      throw new Error("Puppeteer non installé. Lance: npm install puppeteer dans /server");
+      throw new Error(
+        "Puppeteer non installé. Lance: npm install puppeteer dans /server",
+      );
     }
 
     sse.log("Génération HTML preview de l'app (Claude)...");
@@ -251,11 +287,11 @@ app.post("/api/agents/screenshots", async (req, res) => {
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const screens = [
-      { name: "home",     route: "#home",     label: "Track Your Habits Daily" },
-      { name: "checkin",  route: "#checkin",  label: "One Tap Check-In" },
-      { name: "stats",    route: "#stats",    label: "See Your Progress" },
-      { name: "premium",  route: "#premium",  label: "Go Premium — Unlock All" },
-      { name: "darkmode", route: "#dark",     label: "Dark Mode Included" },
+      { name: "home", route: "#home", label: "Track Your Habits Daily" },
+      { name: "checkin", route: "#checkin", label: "One Tap Check-In" },
+      { name: "stats", route: "#stats", label: "See Your Progress" },
+      { name: "premium", route: "#premium", label: "Go Premium — Unlock All" },
+      { name: "darkmode", route: "#dark", label: "Dark Mode Included" },
     ];
 
     const screenshots = [];
@@ -265,9 +301,16 @@ app.post("/api/agents/screenshots", async (req, res) => {
       // Resize + device frame via sharp
       const sharp = require("sharp");
       const framed = await sharp(buf)
-        .resize(1440, 3120, { fit: "contain", background: architecture.theme?.backgroundColor || "#ffffff" })
+        .resize(1440, 3120, {
+          fit: "contain",
+          background: architecture.theme?.backgroundColor || "#ffffff",
+        })
         .toBuffer();
-      screenshots.push({ name: s.name, b64: framed.toString("base64"), size: "1440x3120" });
+      screenshots.push({
+        name: s.name,
+        b64: framed.toString("base64"),
+        size: "1440x3120",
+      });
       await delay(200);
     }
 
@@ -297,7 +340,10 @@ app.post("/api/agents/aso", async (req, res) => {
     sse.log("Génération 13 keywords ASO...");
     const listing = await claudeLib.generateASO(appName, niche, marketData);
     sse.log(`Titre: "${listing.title}"`, "success");
-    sse.log(`Description: ${listing.description.length} chars | ${listing.keywords.length} keywords`, "data");
+    sse.log(
+      `Description: ${listing.description.length} chars | ${listing.keywords.length} keywords`,
+      "data",
+    );
     sse.done(listing);
   } catch (err) {
     sse.fail(err);
@@ -318,10 +364,18 @@ app.post("/api/agents/compliance", async (req, res) => {
   try {
     sse.log("Détection SDKs utilisés: AdMob, Firebase, IAP...");
     sse.log("Génération Privacy Policy RGPD (Claude)...");
-    const policy = await claudeLib.generatePrivacyPolicy(appName, packageId, features);
+    const policy = await claudeLib.generatePrivacyPolicy(
+      appName,
+      packageId,
+      features,
+    );
 
     sse.log("Publication GitHub Pages...");
-    const policyUrl = await githubLib.publishPrivacyPolicy(appName, packageId, policy.html);
+    const policyUrl = await githubLib.publishPrivacyPolicy(
+      appName,
+      packageId,
+      policy.html,
+    );
     sse.log(`Privacy Policy publiée: ${policyUrl}`, "success");
 
     sse.log("Génération Data Safety declaration JSON...");
@@ -337,7 +391,15 @@ app.post("/api/agents/compliance", async (req, res) => {
 // ─── AGENT: BUILD & DEPLOY ──────────────────────────────────────────────────
 app.post("/api/agents/build-deploy", async (req, res) => {
   const sse = createSSE(res);
-  const { appName, packageId, code, listing, policyUrl, logoBase64, screenshots } = req.body;
+  const {
+    appName,
+    packageId,
+    code,
+    listing,
+    policyUrl,
+    logoBase64,
+    screenshots,
+  } = req.body;
 
   if (!IS_PROD) {
     sse.log("[DEV] Mode simulation — pas de build réel");
@@ -356,7 +418,11 @@ app.post("/api/agents/build-deploy", async (req, res) => {
     sse.log("Préparation fichiers Flutter...");
     // 1. Trigger GitHub Actions workflow
     sse.log("Déclenchement GitHub Actions (flutter build appbundle)...");
-    const workflowRun = await githubLib.triggerBuild({ appName, packageId, code });
+    const workflowRun = await githubLib.triggerBuild({
+      appName,
+      packageId,
+      code,
+    });
     sse.log(`Workflow ID: ${workflowRun.id} — en attente...`, "data");
 
     // 2. Poll for completion
@@ -369,26 +435,36 @@ app.post("/api/agents/build-deploy", async (req, res) => {
       attempts++;
     }
 
-    if (status !== "completed") throw new Error("Build timeout — vérifiez GitHub Actions");
+    if (status !== "completed")
+      throw new Error("Build timeout — vérifiez GitHub Actions");
     sse.log("Build Flutter terminé ✅", "success");
 
     // 3. Download AAB from artifacts
     sse.log("Téléchargement AAB depuis GitHub Artifacts...");
-    const aabBuffer = await githubLib.downloadArtifact(workflowRun.id, "app-release.aab");
-    sse.log(`AAB téléchargé: ${(aabBuffer.length / 1024 / 1024).toFixed(1)} MB`, "success");
+    const aabBuffer = await githubLib.downloadArtifact(
+      workflowRun.id,
+      "app-release.aab",
+    );
+    sse.log(
+      `AAB téléchargé: ${(aabBuffer.length / 1024 / 1024).toFixed(1)} MB`,
+      "success",
+    );
 
     // 4. Setup Firebase Remote Config
     sse.log("Configuration Firebase Remote Config...");
     await firebaseLib.setupRemoteConfig(packageId, {
-      ads_banner_id:        "ca-app-pub-3940256099942544/6300978111", // TEST ID
-      ads_interstitial_id:  "ca-app-pub-3940256099942544/1033173712", // TEST ID
-      ads_rewarded_id:      "ca-app-pub-3940256099942544/5224354917", // TEST ID
-      ads_enabled:          "true",
+      ads_banner_id: "ca-app-pub-3940256099942544/6300978111", // TEST ID
+      ads_interstitial_id: "ca-app-pub-3940256099942544/1033173712", // TEST ID
+      ads_rewarded_id: "ca-app-pub-3940256099942544/5224354917", // TEST ID
+      ads_enabled: "true",
       interstitial_every_n: "3",
-      premium_price_usd:    "4.99",
-      show_premium_cta:     "true",
+      premium_price_usd: "4.99",
+      show_premium_cta: "true",
     });
-    sse.log("Firebase Remote Config configuré — IDs AdMob modifiables sans republier ✅", "success");
+    sse.log(
+      "Firebase Remote Config configuré — IDs AdMob modifiables sans republier ✅",
+      "success",
+    );
 
     // 5. Upload to Play Console
     sse.log("Upload AAB vers Play Console (draft)...");
@@ -419,12 +495,16 @@ app.post("/api/agents/build-deploy", async (req, res) => {
 if (IS_PROD) {
   const clientBuild = path.join(__dirname, "../client/dist");
   app.use(express.static(clientBuild));
-  app.get("*", (_req, res) => res.sendFile(path.join(clientBuild, "index.html")));
+  app.get("*", (_req, res) =>
+    res.sendFile(path.join(clientBuild, "index.html")),
+  );
 }
 
 // ─── START ──────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`✅ App Factory Server — port ${PORT} — mode: ${MODE_ENV} — debug: ${MOT_DEBUG}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(
+    `✅ App Factory Server — port ${PORT} — mode: ${MODE_ENV} — debug: ${MOT_DEBUG}`,
+  );
 });
 
 function delay(ms) {
