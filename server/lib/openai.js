@@ -14,7 +14,7 @@ async function generateLogo(prompt) {
     prompt,
     n:       1,
     size:    "1024x1024",
-    quality: "standard",           // standard = $0.011 | high = $0.042
+    quality: "low",           // standard = $0.011 | high = $0.042
     output_format: "png",
   });
 
