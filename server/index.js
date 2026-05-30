@@ -610,13 +610,13 @@ app.post("/api/agents/build-deploy", async (req, res) => {
 });
 
 // ─── STATIC ──────────────────────────────────────────────────────────────────
-if (IS_PROD) {
-  const clientBuild = path.join(__dirname, "../client/dist");
-  app.use(express.static(clientBuild));
-  app.get("*", (_req, res) =>
-    res.sendFile(path.join(clientBuild, "index.html")),
-  );
-}
+// if (IS_PROD) {
+//   const clientBuild = path.join(__dirname, "../client/dist");
+//   app.use(express.static(clientBuild));
+//   app.get("*", (_req, res) =>
+//     res.sendFile(path.join(clientBuild, "index.html")),
+//   );
+// }
 
 app.listen(PORT, () => {
   console.log(
