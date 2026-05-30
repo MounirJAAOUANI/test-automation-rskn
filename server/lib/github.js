@@ -1,20 +1,18 @@
 "use strict";
 /**
- * server/lib/github.js — VERSION CORRIGÉE
+ * server/lib/github.js — VERSION FINALE
  *
- * Corrections :
- * 1. repoPath = policies/${fileName}  (fichier dans sous-dossier du repo)
- * 2. triggerBuild() : snapshot IDs avant dispatch → récupère le bon runId
- * 3. downloadArtifact() : retourne le ZIP brut (dézippage dans index.js avec adm-zip)
- * 4. uploadToPlayConsole() : versionCodes = [1] (entiers, pas strings)
+ * publishPrivacyPolicy :
+ *   - repoPath = policies/${fileName}   ← fichier dans /policies/ dans le repo
+ *   - URL Vercel retournée = VERCEL_PROJECT_URL/${fileName}  (sans /policies/)
+ *     Vercel rewrite doit mapper /<file> → /policies/<file>
+ *     OU configurer vercel.json (voir README)
  *
- * Variables d'env Railway requises :
- *   GITHUB_TOKEN         ghp_...
- *   GITHUB_OWNER         ex: MounirJAAOUANI
- *   GITHUB_REPO          ex: test-automation-rskn
- *   VERCEL_PROJECT_URL   ex: https://test-automation-rskn.vercel.app
- *   GOOGLE_PLAY_SERVICE_ACCOUNT  JSON minifié
- *   GOOGLE_PLAY_DEVELOPER_ID     ID numérique développeur
+ * uploadToPlayConsole :
+ *   - versionCodes = [1] (entiers) pas ["1"] (strings)
+ *
+ * downloadArtifact :
+ *   - Retourne le Buffer ZIP brut (extraction dans index.js avec adm-zip)
  */
 
 const fetch = require("node-fetch");
@@ -28,7 +26,6 @@ const VERCEL_PROJECT_URL = (process.env.VERCEL_PROJECT_URL || "").replace(
 );
 const GH_API = "https://api.github.com";
 
-// ─── HEADERS ─────────────────────────────────────────────────────────────────
 function ghHeaders() {
   return {
     Authorization: `Bearer ${GITHUB_TOKEN}`,
@@ -38,15 +35,9 @@ function ghHeaders() {
   };
 }
 
-// ─── TRIGGER BUILD — récupère le bon runId ───────────────────────────────────
-/**
- * Stratégie fiable pour obtenir le runId du build qu'on vient de déclencher :
- *  1. Capture les runIds existants AVANT le dispatch
- *  2. Dispatche le workflow
- *  3. Poll toutes les 3s jusqu'à voir un runId NOUVEAU
- */
+// ─── TRIGGER BUILD ────────────────────────────────────────────────────────────
 async function triggerBuild({ appName, packageId, primaryColor }) {
-  // 1. Snapshot des runs existants
+  // Snapshot des runs existants avant dispatch
   const beforeRes = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs?per_page=10&branch=main`,
     { headers: ghHeaders() },
@@ -56,7 +47,7 @@ async function triggerBuild({ appName, packageId, primaryColor }) {
     (beforeData.workflow_runs || []).map((r) => r.id),
   );
 
-  // 2. Dispatch
+  // Dispatch
   const cleanColor = (primaryColor || "7C3AED").replace(/#/g, "");
   const trigRes = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/build.yml/dispatches`,
@@ -78,23 +69,22 @@ async function triggerBuild({ appName, packageId, primaryColor }) {
     const errText = await trigRes.text();
     throw new Error(
       `GitHub Actions dispatch failed (${trigRes.status}): ${errText}\n` +
-        `Vérifiez que GITHUB_TOKEN a le scope "workflow" et que build.yml existe dans le repo.`,
+        `Vérifiez que GITHUB_TOKEN a le scope "workflow" et que build.yml existe.`,
     );
   }
 
-  // 3. Polling — attendre qu'un runId nouveau apparaisse (max 36s)
+  // Poll jusqu'à voir le nouveau run (max 36s)
   let newRun = null;
   for (let i = 0; i < 12; i++) {
     await new Promise((r) => setTimeout(r, 3000));
-
     const afterRes = await fetch(
       `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs?per_page=10&branch=main`,
       { headers: ghHeaders() },
     );
     const afterData = await afterRes.json();
-    const runs = afterData.workflow_runs || [];
-    const fresh = runs.find((r) => !existingIds.has(r.id));
-
+    const fresh = (afterData.workflow_runs || []).find(
+      (r) => !existingIds.has(r.id),
+    );
     if (fresh) {
       newRun = fresh;
       break;
@@ -103,43 +93,29 @@ async function triggerBuild({ appName, packageId, primaryColor }) {
 
   if (!newRun) {
     throw new Error(
-      "Impossible de trouver le nouveau run GitHub Actions après déclenchement. " +
-        "Vérifiez que GITHUB_TOKEN a le scope 'workflow' et que le fichier " +
-        ".github/workflows/build.yml existe dans le repo.",
+      "Impossible de trouver le nouveau run après dispatch. " +
+        "Vérifiez que GITHUB_TOKEN a le scope 'workflow'.",
     );
   }
 
   return newRun;
 }
 
-// ─── GET WORKFLOW STATUS ──────────────────────────────────────────────────────
+// ─── GET STATUS ───────────────────────────────────────────────────────────────
 async function getWorkflowStatus(runId) {
   const res = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}`,
     { headers: ghHeaders() },
   );
-
-  if (!res.ok) {
-    throw new Error(`GitHub status check failed (${res.status})`);
-  }
-
+  if (!res.ok) throw new Error(`GitHub status check failed (${res.status})`);
   const data = await res.json();
-
   if (data.status === "completed") {
     return data.conclusion === "success" ? "completed" : "failure";
   }
-  return data.status || "in_progress"; // "queued" ou "in_progress"
+  return data.status || "in_progress";
 }
 
-// ─── DOWNLOAD ARTIFACT — retourne le ZIP brut ────────────────────────────────
-/**
- * Retourne le contenu binaire du ZIP de l'artifact.
- * L'extraction du .aab ou .apk est faite dans index.js avec adm-zip.
- *
- * Noms d'artifacts dans build.yml :
- *   "app-release-aab"  → ZIP contenant app-release.aab
- *   "app-debug-apk"    → ZIP contenant app-debug.apk
- */
+// ─── DOWNLOAD ARTIFACT — retourne ZIP brut ───────────────────────────────────
 async function downloadArtifact(runId, artifactName) {
   const listRes = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}/artifacts`,
@@ -147,13 +123,13 @@ async function downloadArtifact(runId, artifactName) {
   );
   const listData = await listRes.json();
   const artifacts = listData.artifacts || [];
-
   const artifact = artifacts.find((a) => a.name === artifactName);
+
   if (!artifact) {
     const available = artifacts.map((a) => `"${a.name}"`).join(", ") || "aucun";
     throw new Error(
-      `Artifact "${artifactName}" introuvable pour le run ${runId}. ` +
-        `Artifacts disponibles : ${available}`,
+      `Artifact "${artifactName}" introuvable pour run ${runId}. ` +
+        `Disponibles : ${available}`,
     );
   }
 
@@ -161,47 +137,35 @@ async function downloadArtifact(runId, artifactName) {
     headers: ghHeaders(),
     redirect: "follow",
   });
-
-  if (!dlRes.ok) {
+  if (!dlRes.ok)
     throw new Error(`Téléchargement artifact échoué (${dlRes.status})`);
-  }
-
   return dlRes.buffer();
 }
 
-// ─── PUBLISH PRIVACY POLICY → GitHub (Vercel) ────────────────────────────────
+// ─── PUBLISH PRIVACY POLICY ───────────────────────────────────────────────────
 /**
- * Écrit le HTML dans policies/<filename> dans le repo GitHub.
- * Vercel déploie automatiquement les nouveaux fichiers.
- * URL publique retournée : VERCEL_PROJECT_URL/<filename>
+ * Écrit dans policies/${fileName} dans le repo GitHub.
+ * Vercel déploie → URL publique = VERCEL_PROJECT_URL/${fileName} (sans /policies/).
  *
- * Ex: policies/com-appfactory-wealthflow-privacy.html dans le repo
- * → https://test-automation-rskn.vercel.app/com-appfactory-wealthflow-privacy.html
- *
- * Note Vercel : si le fichier est dans /policies/ dans le repo, Vercel le sert à /policies/<file>
- * → adapter VERCEL_PROJECT_URL en conséquence, ou utiliser rewrites Vercel.
- * Par défaut ici on met le fichier à la RACINE du dossier policies/ du repo.
+ * Pour que Vercel serve /policies/<file> à /<file>, ajoute vercel.json à la racine du repo :
+ * {
+ *   "rewrites": [
+ *     { "source": "/:file(.*-privacy.html)", "destination": "/policies/:file" }
+ *   ]
+ * }
  */
 async function publishPrivacyPolicy(appName, packageId, html) {
   const fileName = `${packageId.replace(/\./g, "-")}-privacy.html`;
+  const repoPath = `policies/${fileName}`; // ← dans /policies/ dans le repo
 
-  // CORRECTION : repoPath utilise le sous-dossier policies/
-  const repoPath = `policies/${fileName}`;
-
-  // SHA pour mise à jour éventuelle
   let sha;
   try {
     const checkRes = await fetch(
       `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${repoPath}`,
       { headers: ghHeaders() },
     );
-    if (checkRes.ok) {
-      const existing = await checkRes.json();
-      sha = existing.sha;
-    }
-  } catch {
-    /* fichier inexistant = première création */
-  }
+    if (checkRes.ok) sha = (await checkRes.json()).sha;
+  } catch {}
 
   const putRes = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${repoPath}`,
@@ -219,29 +183,20 @@ async function publishPrivacyPolicy(appName, packageId, html) {
   );
 
   if (!putRes.ok) {
-    const errText = await putRes.text();
-    throw new Error(`GitHub upload failed (${putRes.status}): ${errText}`);
-  }
-
-  if (!VERCEL_PROJECT_URL) {
     throw new Error(
-      "Variable VERCEL_PROJECT_URL manquante dans Railway. " +
-        "Ajoute : VERCEL_PROJECT_URL=https://ton-projet.vercel.app",
+      `GitHub upload failed (${putRes.status}): ${await putRes.text()}`,
     );
   }
 
-  // Vercel sert les fichiers du repo à leur chemin relatif
-  // Si le fichier est dans policies/ dans le repo → URL = /policies/<filename>
+  if (!VERCEL_PROJECT_URL) {
+    throw new Error("Variable VERCEL_PROJECT_URL manquante dans Railway.");
+  }
+
+  // URL sans /policies/ — Vercel rewrite gère la redirection
   return `${VERCEL_PROJECT_URL}/${fileName}`;
 }
 
 // ─── UPLOAD TO PLAY CONSOLE ───────────────────────────────────────────────────
-/**
- * Upload AAB (Buffer déjà extrait du ZIP) sur Play Console en brouillon.
- *
- * Correction critique : versionCodes doit être un tableau d'entiers [1]
- * et non de strings ["1"] — l'API Play rejette silencieusement les strings.
- */
 async function uploadToPlayConsole({
   packageId,
   aabBuffer,
@@ -265,7 +220,6 @@ async function uploadToPlayConsole({
     credentials: serviceAccount,
     scopes: ["https://www.googleapis.com/auth/androidpublisher"],
   });
-
   const pub = google.androidpublisher({ version: "v3", auth });
 
   // 1. Créer l'edit
@@ -273,7 +227,7 @@ async function uploadToPlayConsole({
   const editId = editRes.data.id;
   if (!editId) throw new Error("Play Console : impossible de créer un edit.");
 
-  // 2. Upload AAB
+  // 2. Upload AAB (Buffer extrait du ZIP)
   const { Readable } = require("stream");
   await pub.edits.bundles.upload({
     packageName: packageId,
@@ -313,22 +267,15 @@ async function uploadToPlayConsole({
   }
 
   // 5. Track internal draft
-  // CORRECTION : versionCodes = [1] (entiers) pas ["1"] (strings)
+  // versionCodes = entiers [1] pas strings ["1"]
   await pub.edits.tracks.update({
     packageName: packageId,
     editId,
     track: "internal",
-    requestBody: {
-      releases: [
-        {
-          status: "draft",
-          versionCodes: [1], // ← entier, pas string
-        },
-      ],
-    },
+    requestBody: { releases: [{ status: "draft", versionCodes: [1] }] },
   });
 
-  // 6. Commit → rend le brouillon visible dans Play Console
+  // 6. Commit
   const commitRes = await pub.edits.commit({
     packageName: packageId,
     editId,

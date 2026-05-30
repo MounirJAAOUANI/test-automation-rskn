@@ -1,18 +1,30 @@
 /**
- * api.js — Toutes les communications client → serveur.
- * Utilise SSE (Server-Sent Events) via fetch + ReadableStream
- * pour afficher les logs en temps réel.
+ * client/src/api.js — VERSION FINALE
+ *
+ * Deux modes de communication :
+ *
+ * 1. runAgent()   → SSE pour les agents courts (< 60s)
+ *    Utilisé pour : market-scout, app-architect, logo-gen, code-gen,
+ *                   screenshots, aso, compliance
+ *
+ * 2. runBuildAgent() → HTTP POST + polling pour build-deploy (5-15 min)
+ *    Le serveur répond immédiatement avec { jobId }
+ *    Le client poll GET /api/jobs/:jobId toutes les 3s
+ *    Pas de SSE → pas de timeout Railway
  */
 
-const BASE = import.meta.env.VITE_API_URL || "/api";
+const BASE = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace(/\/$/, "")
+  : "/api";
 
+// ─── SSE — pour les agents courts ────────────────────────────────────────────
 /**
  * Lance un agent via SSE.
- * @param {string}   agentId    — ex: "market-scout"
- * @param {object}   payload    — données envoyées au serveur
- * @param {function} onLog      — appelé pour chaque log  : ({ event, type, msg, ts })
- * @param {function} onDone     — appelé quand terminé    : (data)
- * @param {function} onError    — appelé si erreur        : ({ msg, detail })
+ * @param {string}   agentId
+ * @param {object}   payload
+ * @param {function} onLog    — ({ event, type, msg, ts })
+ * @param {function} onDone   — (data)
+ * @param {function} onError  — ({ msg, detail })
  */
 export async function runAgent(agentId, payload, onLog, onDone, onError) {
   let response;
@@ -34,7 +46,6 @@ export async function runAgent(agentId, payload, onLog, onDone, onError) {
     return;
   }
 
-  // ─── Lecture SSE depuis le body stream ──────────────────────────────────
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -53,12 +64,14 @@ export async function runAgent(agentId, payload, onLog, onDone, onError) {
 
     buffer += decoder.decode(value, { stream: true });
 
-    // Parser les lignes SSE (format: "data: {...}\n\n")
     const lines = buffer.split("\n");
-    buffer = lines.pop() ?? ""; // garder le fragment incomplet
+    buffer = lines.pop() ?? "";
 
     for (const line of lines) {
+      // Ignorer les commentaires SSE (heartbeat ": ping")
+      if (line.startsWith(":")) continue;
       if (!line.startsWith("data: ")) continue;
+
       const raw = line.slice(6).trim();
       if (!raw) continue;
 
@@ -82,10 +95,110 @@ export async function runAgent(agentId, payload, onLog, onDone, onError) {
   }
 }
 
+// ─── POLLING — pour build-deploy ─────────────────────────────────────────────
 /**
- * Vérifie que le serveur est joignable.
- * @returns {{ ok: boolean, mode: string, debug: boolean } | null}
+ * Lance le build-deploy via HTTP POST (réponse immédiate avec jobId)
+ * puis poll GET /api/jobs/:jobId toutes les POLL_INTERVAL ms.
+ *
+ * Pas de SSE → pas de timeout Railway quelle que soit la durée.
+ *
+ * @param {object}   payload
+ * @param {function} onLog    — ({ ts, msg, type })
+ * @param {function} onDone   — (data)
+ * @param {function} onError  — ({ msg, detail })
  */
+export async function runBuildAgent(payload, onLog, onDone, onError) {
+  const POLL_INTERVAL = 3000; // 3s entre chaque poll
+  const MAX_POLLS = 300; // 300 × 3s = 15 min max côté client
+
+  // 1. Lancer le job (réponse en ~1s)
+  let jobId;
+  try {
+    const res = await fetch(`${BASE}/agents/build-deploy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      onError({ msg: `Erreur HTTP ${res.status}`, detail: text });
+      return;
+    }
+    const data = await res.json();
+    jobId = data.jobId;
+    if (!jobId) {
+      onError({
+        msg: "Pas de jobId retourné par le serveur",
+        detail: JSON.stringify(data),
+      });
+      return;
+    }
+  } catch (err) {
+    onError({ msg: "Serveur inaccessible", detail: err.message });
+    return;
+  }
+
+  // 2. Poll jusqu'à done ou error
+  let cursor = 0;
+  let polls = 0;
+
+  while (polls < MAX_POLLS) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+    polls++;
+
+    let state;
+    try {
+      const res = await fetch(`${BASE}/jobs/${jobId}?cursor=${cursor}`);
+      if (!res.ok) {
+        // Erreur réseau temporaire — on continue
+        onLog({
+          ts: now(),
+          msg: `Poll réseau error (${res.status}) — retry...`,
+          type: "warn",
+        });
+        continue;
+      }
+      state = await res.json();
+    } catch (err) {
+      onLog({
+        ts: now(),
+        msg: `Poll réseau error — retry... (${err.message})`,
+        type: "warn",
+      });
+      continue;
+    }
+
+    if (!state.found) {
+      onError({ msg: "Job introuvable sur le serveur" });
+      return;
+    }
+
+    // Envoyer les nouveaux logs au composant
+    for (const log of state.newLogs || []) {
+      onLog(log);
+    }
+    cursor = state.cursor;
+
+    // Terminé avec succès
+    if (state.status === "done") {
+      onDone(state.result);
+      return;
+    }
+
+    // Terminé en erreur
+    if (state.status === "error") {
+      onError({ msg: state.error, detail: state.error });
+      return;
+    }
+
+    // status === "running" → continuer le polling
+  }
+
+  // Timeout client (ne devrait pas arriver)
+  onError({ msg: "Timeout client après 15 minutes — vérifiez GitHub Actions" });
+}
+
+// ─── HEALTH CHECK ────────────────────────────────────────────────────────────
 export async function healthCheck() {
   try {
     const res = await fetch(`${BASE}/health`);
@@ -93,4 +206,13 @@ export async function healthCheck() {
   } catch {
     return null;
   }
+}
+
+// ─── HELPER ──────────────────────────────────────────────────────────────────
+function now() {
+  return new Date().toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
