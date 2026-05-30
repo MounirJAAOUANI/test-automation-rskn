@@ -10,11 +10,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'APP_NAME_PLACEHOLDER',
+      title: 'Template App',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFPRIMARY_COLOR_PLACEHOLDER),
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF7C3AED)),
         useMaterial3: true,
       ),
       home: const HomePage(),
@@ -28,8 +27,8 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('APP_NAME_PLACEHOLDER')),
-      body: const Center(child: Text('Hello from App Factory')),
+      appBar: AppBar(title: const Text('Template App')),
+      body: const Center(child: Text('App Factory Template')),
     );
   }
 }

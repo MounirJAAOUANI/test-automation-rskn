@@ -10,6 +10,8 @@ const playstoreLib = require("./lib/playstore");
 const firebaseLib = require("./lib/firebase");
 const githubLib = require("./lib/github");
 
+const ppLib = require("./lib/privacypolicy");
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -353,36 +355,67 @@ app.post("/api/agents/aso", async (req, res) => {
 // ─── AGENT: COMPLIANCE ──────────────────────────────────────────────────────
 app.post("/api/agents/compliance", async (req, res) => {
   const sse = createSSE(res);
-  const { appName, packageId, features } = req.body;
+  const { appName, packageId, features = [] } = req.body;
 
   if (!IS_PROD) {
-    sse.log("[DEV] Mode simulation");
-    await delay(600);
-    return sse.done(claudeLib.mockCompliance(appName, packageId));
+    sse.log("[DEV] Mode simulation — génération Privacy Policy locale");
+    await delay(400);
+    const html = ppLib.generatePrivacyPolicyHTML(
+      appName || "MyApp",
+      packageId || "com.appfactory.myapp",
+      features,
+      "7C3AED",
+      "privacy@appfactory.dev",
+    );
+    const ds = ppLib.generateDataSafetyJSON(features);
+    return sse.done({
+      policyUrl: `https://yourname.github.io/${(packageId || "myapp").replace(/\./g, "-")}-privacy.html`,
+      policy: { html },
+      dataSafety: ds,
+    });
   }
 
   try {
-    sse.log("Détection SDKs utilisés: AdMob, Firebase, IAP...");
-    sse.log("Génération Privacy Policy RGPD (Claude)...");
-    const policy = await claudeLib.generatePrivacyPolicy(
+    sse.log("Détection SDKs utilisés...");
+    const sdks = [];
+    if (features.some((f) => /admob|ads/i.test(f))) sdks.push("Google AdMob");
+    if (features.some((f) => /firebase/i.test(f)))
+      sdks.push("Firebase Remote Config");
+    if (features.some((f) => /iap|purchase/i.test(f)))
+      sdks.push("In-App Purchase");
+    if (features.some((f) => /notif/i.test(f))) sdks.push("Notifications push");
+    sdks.push("Stockage local (SharedPreferences)");
+    sse.log(`SDKs détectés : ${sdks.join(", ")}`, "data");
+
+    sse.log("Génération Privacy Policy HTML (template local)...");
+    const primaryColor = "7C3AED"; // ou récupérer depuis l'architecture si passé
+    const html = ppLib.generatePrivacyPolicyHTML(
       appName,
       packageId,
       features,
+      primaryColor,
+      "privacy@appfactory.dev",
+    );
+    sse.log(`HTML généré — ${html.length} caractères ✅`, "success");
+
+    sse.log("Génération Data Safety declaration JSON...");
+    const dataSafety = ppLib.generateDataSafetyJSON(features);
+    sse.log(
+      `Data Safety : ${dataSafety.dataTypes.length} types de données déclarés ✅`,
+      "success",
     );
 
     sse.log("Publication GitHub Pages...");
     const policyUrl = await githubLib.publishPrivacyPolicy(
       appName,
       packageId,
-      policy.html,
+      html,
     );
-    sse.log(`Privacy Policy publiée: ${policyUrl}`, "success");
+    sse.log(`Privacy Policy publiée : ${policyUrl}`, "success");
 
-    sse.log("Génération Data Safety declaration JSON...");
-    const dataSafety = await claudeLib.generateDataSafety(appName, features);
-    sse.log("UMP (User Messaging Platform) RGPD configuré ✅", "success");
+    sse.log("Configuration UMP (User Messaging Platform) intégrée ✅", "data");
 
-    sse.done({ policyUrl, policy, dataSafety });
+    sse.done({ policyUrl, policy: { html }, dataSafety });
   } catch (err) {
     sse.fail(err);
   }
