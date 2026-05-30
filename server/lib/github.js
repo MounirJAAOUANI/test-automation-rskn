@@ -232,7 +232,7 @@ async function publishPrivacyPolicy(appName, packageId, html) {
 
   // Vercel sert les fichiers du repo à leur chemin relatif
   // Si le fichier est dans policies/ dans le repo → URL = /policies/<filename>
-  return `${VERCEL_PROJECT_URL}/policies/${fileName}`;
+  return `${VERCEL_PROJECT_URL}/${fileName}`;
 }
 
 // ─── UPLOAD TO PLAY CONSOLE ───────────────────────────────────────────────────
