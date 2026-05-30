@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       app_name:
-        description: "Nom de l'application (ex: SpendSense)"
+        description: "Nom de l'application (ex: WealthFlow)"
         required: true
         type: string
       package_id:
-        description: "Package ID complet (ex: com.yourname.spendsense)"
+        description: "Package ID complet (ex: com.appfactory.wealthflow)"
         required: true
         type: string
       primary_color:
-        description: "Couleur hex SANS le # (ex: 7C3AED)"
+        description: "Couleur hex — avec ou sans # (ex: 7C3AED ou #7C3AED)"
         required: false
         type: string
         default: "7C3AED"
@@ -27,14 +27,14 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # ── 2. Java 17 (requis Flutter 3.22+) ────────────────────────────────
+      # ── 2. Java 17 ────────────────────────────────────────────────────────
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      # ── 3. Flutter stable ────────────────────────────────────────────────
+      # ── 3. Flutter stable ─────────────────────────────────────────────────
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -42,46 +42,53 @@ jobs:
           channel: "stable"
           cache: true
 
-      # ── 4. Générer un projet Flutter propre avec v2 embedding ────────────
-      #    On génère dans /tmp, puis on copie les fichiers Android/iOS dans le repo.
-      #    Cela garantit que TOUS les fichiers Android v2 sont présents et corrects.
-      - name: Generate clean Flutter project (v2 embedding)
+      # ── 4. Préparer les variables ─────────────────────────────────────────
+      - name: Prepare variables
         run: |
-          # Calcule le dart_name : lettres minuscules + chiffres + underscore uniquement
+          # DART_NAME : lettres minuscules + chiffres + underscore uniquement
           DART_NAME=$(echo "${{ inputs.app_name }}" \
             | tr '[:upper:]' '[:lower:]' \
             | tr ' ' '_' \
             | sed 's/[^a-z0-9_]//g')
-          echo "DART_NAME=$DART_NAME" >> $GITHUB_ENV
 
-          # Extrait org et appname depuis le package_id
-          # ex: com.yourname.spendsense → org=com.yourname, appname=spendsense
+          # STRIP LE # DE LA COULEUR — c'est le bug : Color(0xFF#7C3AED) est invalide en Dart
+          # On enlève le # s'il est présent pour avoir juste les 6 caractères hex
+          COLOR_HEX=$(echo "${{ inputs.primary_color }}" | sed 's/#//g')
+
+          # Extraire org et appname depuis le package_id
           PACKAGE_ORG=$(echo "${{ inputs.package_id }}" | rev | cut -d'.' -f2- | rev)
           PACKAGE_APP=$(echo "${{ inputs.package_id }}" | rev | cut -d'.' -f1 | rev)
-          echo "PACKAGE_ORG=$PACKAGE_ORG"  >> $GITHUB_ENV
-          echo "PACKAGE_APP=$PACKAGE_APP"  >> $GITHUB_ENV
 
-          echo "▶ Generating Flutter project..."
+          echo "DART_NAME=$DART_NAME"         >> $GITHUB_ENV
+          echo "COLOR_HEX=$COLOR_HEX"         >> $GITHUB_ENV
+          echo "PACKAGE_ORG=$PACKAGE_ORG"     >> $GITHUB_ENV
+          echo "PACKAGE_APP=$PACKAGE_APP"     >> $GITHUB_ENV
+
+          echo "▶ Variables calculées :"
+          echo "  DART_NAME   = $DART_NAME"
+          echo "  COLOR_HEX   = $COLOR_HEX  (sans #, prêt pour Dart)"
+          echo "  PACKAGE_ORG = $PACKAGE_ORG"
+          echo "  PACKAGE_APP = $PACKAGE_APP"
+
+      # ── 5. Générer un projet Flutter propre (v2 embedding) ───────────────
+      - name: Generate clean Flutter project
+        run: |
+          echo "▶ Generating Flutter project in /tmp/flutter_gen..."
           flutter create \
             --org "$PACKAGE_ORG" \
             --project-name "$DART_NAME" \
             --platforms android \
             /tmp/flutter_gen
+          echo "✅ Flutter project generated"
 
-          echo "✅ Flutter project generated:"
-          ls /tmp/flutter_gen
-
-      # ── 5. Copier les fichiers Android générés dans le repo ──────────────
-      - name: Copy generated Android files into repo
+      # ── 6. Copier les fichiers Android dans le repo ───────────────────────
+      - name: Copy Android platform files
         run: |
-          echo "▶ Copying Android platform files..."
           rm -rf android
           cp -r /tmp/flutter_gen/android ./android
-          echo "✅ Android files copied"
-          echo "--- android/app/build.gradle ---"
-          cat android/app/build.gradle
+          echo "✅ Android v2 files copied"
 
-      # ── 6. Injecter le pubspec.yaml avec le bon nom et package ───────────
+      # ── 7. Injecter pubspec.yaml ──────────────────────────────────────────
       - name: Inject pubspec.yaml
         run: |
           cat > pubspec.yaml << EOF
@@ -107,18 +114,15 @@ jobs:
           flutter:
             uses-material-design: true
           EOF
+          echo "✅ pubspec.yaml injected"
 
-          echo "✅ pubspec.yaml injected:"
-          cat pubspec.yaml
-
-      # ── 7. Injecter lib/main.dart avec les vraies valeurs ────────────────
+      # ── 8. Injecter lib/main.dart — SANS LE # DANS LA COULEUR ────────────
       - name: Inject lib/main.dart
         run: |
-          # Convertit la couleur hex en int Dart (0xFF + hex sans #)
-          COLOR_INT="0xFF${{ inputs.primary_color }}"
-
           mkdir -p lib
 
+          # COLOR_HEX est déjà sans # (ex: 7C3AED)
+          # En Dart : const Color(0xFF7C3AED) — syntaxe correcte
           cat > lib/main.dart << DARTEOF
           import 'package:flutter/material.dart';
 
@@ -136,7 +140,7 @@ jobs:
                 debugShowCheckedModeBanner: false,
                 theme: ThemeData(
                   colorScheme: ColorScheme.fromSeed(
-                    seedColor: const Color($COLOR_INT),
+                    seedColor: const Color(0xFF${COLOR_HEX}),
                   ),
                   useMaterial3: true,
                 ),
@@ -153,18 +157,25 @@ jobs:
               return Scaffold(
                 appBar: AppBar(
                   title: const Text('${{ inputs.app_name }}'),
-                  backgroundColor: const Color($COLOR_INT),
+                  backgroundColor: const Color(0xFF${COLOR_HEX}),
                   foregroundColor: Colors.white,
                 ),
                 body: const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.rocket_launch, size: 64, color: Color($COLOR_INT)),
+                      Icon(
+                        Icons.rocket_launch,
+                        size: 64,
+                        color: Color(0xFF${COLOR_HEX}),
+                      ),
                       SizedBox(height: 16),
                       Text(
                         '${{ inputs.app_name }}',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       SizedBox(height: 8),
                       Text('Built with App Factory'),
@@ -177,35 +188,34 @@ jobs:
           DARTEOF
 
           echo "✅ lib/main.dart injected"
-          head -20 lib/main.dart
+          echo "--- Vérification couleur dans main.dart ---"
+          grep "Color(0xFF" lib/main.dart
 
-      # ── 8. Vérification des fichiers ─────────────────────────────────────
+      # ── 9. Vérification structure ─────────────────────────────────────────
       - name: Verify project structure
         run: |
-          echo "=== Project root ==="
-          ls -la
-          echo "=== lib/ ==="
-          ls -la lib/
-          echo "=== android/app/ ==="
-          ls -la android/app/
-          echo "=== android/app/build.gradle ==="
-          cat android/app/build.gradle
           echo "=== pubspec.yaml ==="
           cat pubspec.yaml
+          echo ""
+          echo "=== Couleurs dans main.dart ==="
+          grep "Color" lib/main.dart || true
+          echo ""
+          echo "=== android/app/build.gradle ==="
+          cat android/app/build.gradle
 
-      # ── 9. flutter pub get ────────────────────────────────────────────────
+      # ── 10. flutter pub get ───────────────────────────────────────────────
       - name: Flutter pub get
         run: flutter pub get
 
-      # ── 10. Build AAB release ─────────────────────────────────────────────
+      # ── 11. Build AAB release ─────────────────────────────────────────────
       - name: Flutter build appbundle
         run: flutter build appbundle --release
 
-      # ── 11. Build APK debug (pour test téléphone) ─────────────────────────
+      # ── 12. Build APK debug ───────────────────────────────────────────────
       - name: Flutter build APK debug
         run: flutter build apk --debug
 
-      # ── 12. Upload AAB ────────────────────────────────────────────────────
+      # ── 13. Upload AAB ────────────────────────────────────────────────────
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
@@ -213,7 +223,7 @@ jobs:
           path: build/app/outputs/bundle/release/app-release.aab
           retention-days: 30
 
-      # ── 13. Upload APK debug ──────────────────────────────────────────────
+      # ── 14. Upload APK debug ──────────────────────────────────────────────
       - name: Upload APK debug artifact
         uses: actions/upload-artifact@v4
         with:
@@ -221,15 +231,14 @@ jobs:
           path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 30
 
-      # ── 14. Résumé final ──────────────────────────────────────────────────
+      # ── 15. Résumé ────────────────────────────────────────────────────────
       - name: Build summary
         run: |
           AAB_SIZE=$(du -sh build/app/outputs/bundle/release/app-release.aab 2>/dev/null | cut -f1 || echo "N/A")
-          APK_SIZE=$(du -sh build/app/outputs/flutter-apk/app-debug.apk 2>/dev/null | cut -f1 || echo "N/A")
-          echo "✅ Build terminé avec succès"
-          echo "  App name  : ${{ inputs.app_name }}"
-          echo "  Package   : ${{ inputs.package_id }}"
-          echo "  Dart name : $DART_NAME"
-          echo "  Color     : #${{ inputs.primary_color }}"
-          echo "  AAB size  : $AAB_SIZE"
-          echo "  APK size  : $APK_SIZE"
+          APK_SIZE=$(du -sh build/app/outputs/flutter-apk/app-debug.apk       2>/dev/null | cut -f1 || echo "N/A")
+          echo "✅ BUILD RÉUSSI"
+          echo "  App      : ${{ inputs.app_name }}"
+          echo "  Package  : ${{ inputs.package_id }}"
+          echo "  Color    : #${COLOR_HEX}"
+          echo "  AAB size : $AAB_SIZE"
+          echo "  APK size : $APK_SIZE"
