@@ -61,7 +61,7 @@ async function publishPrivacyPolicy(appName, packageId, html) {
   const fileName = `${packageId.replace(/\./g, "-")}-privacy.html`;
 
   // Chemin dans le repo : à la racine pour Vercel
-  const repoPath = fileName;
+  const repoPath = `policies/${fileName}`;
 
   // Vérifier si le fichier existe déjà (pour récupérer son SHA — requis pour update)
   let sha;
