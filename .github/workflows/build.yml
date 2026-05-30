@@ -1,21 +1,107 @@
 name: Build Flutter
+
 on:
   workflow_dispatch:
     inputs:
-      app_name:      { required: true, type: string }
-      package_id:    { required: true, type: string }
-      primary_color: { required: false, type: string, default: '#7C3AED' }
+      app_name:
+        description: "Nom de l'application"
+        required: true
+        type: string
+      package_id:
+        description: "Package ID (ex: com.yourname.habitflow)"
+        required: true
+        type: string
+      primary_color:
+        description: "Couleur principale hex sans # (ex: 7C3AED)"
+        required: false
+        type: string
+        default: "7C3AED"
+
 jobs:
   build:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with: { flutter-version: '3.22.0' }
-      - run: flutter pub get
-      - run: flutter build appbundle --release
-      - uses: actions/upload-artifact@v4
+      # 1. Récupère le code du repo
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Installe Flutter
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          name: app-release.aab
+          flutter-version: "3.22.0"
+          channel: "stable"
+          cache: true
+
+      # Si tu n'as pas Flutter installé en local
+      # Tu as besoin des fichiers Android générés par Flutter. Le plus simple est de faire générer le projet une fois depuis GitHub Actions avec une étape supplémentaire :
+
+      # Ajoute cette étape AVANT "Inject app variables" si c'est le premier build
+      - name: Generate Android project if missing
+        run: |
+          if [ ! -f "android/app/src/main/AndroidManifest.xml" ]; then
+            echo "Premier build — génération des fichiers Android..."
+            flutter create --org com.appfactory --project-name template_app /tmp/flutter_template
+            cp -r /tmp/flutter_template/android ./android
+            cp -r /tmp/flutter_template/ios ./ios
+          fi
+
+      # 3. Injecte les valeurs dynamiques dans les fichiers template
+      - name: Inject app variables
+        run: |
+          # Nettoie le nom pour en faire un identifiant Dart valide
+          DART_NAME=$(echo "${{ inputs.app_name }}" | tr ' ' '_' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_]//g')
+          echo "DART_NAME=$DART_NAME" >> $GITHUB_ENV
+
+          # Remplace les placeholders dans pubspec.yaml
+          sed -i "s/APP_NAME_PLACEHOLDER/$DART_NAME/g" pubspec.yaml
+
+          # Remplace les placeholders dans lib/main.dart
+          sed -i "s/APP_NAME_PLACEHOLDER/${{ inputs.app_name }}/g" lib/main.dart
+          sed -i "s/PRIMARY_COLOR_PLACEHOLDER/${{ inputs.primary_color }}/g" lib/main.dart
+
+          # Remplace les placeholders dans android/app/build.gradle
+          sed -i "s/PACKAGE_ID_PLACEHOLDER/${{ inputs.package_id }}/g" android/app/build.gradle
+
+          echo "✅ Variables injectées :"
+          echo "  app_name   = ${{ inputs.app_name }}"
+          echo "  dart_name  = $DART_NAME"
+          echo "  package_id = ${{ inputs.package_id }}"
+          echo "  color      = #${{ inputs.primary_color }}"
+
+      # 4. Vérifie que pubspec.yaml est valide
+      - name: Verify pubspec.yaml
+        run: |
+          echo "--- pubspec.yaml ---"
+          cat pubspec.yaml
+          echo "--- lib/main.dart (premières lignes) ---"
+          head -20 lib/main.dart
+
+      # 5. Installe les dépendances Flutter
+      - name: Flutter pub get
+        run: flutter pub get
+
+      # 6. Build l'AAB release
+      - name: Flutter build appbundle
+        run: flutter build appbundle --release
+
+      # 7. Upload l'AAB comme artifact GitHub
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-${{ inputs.package_id }}
           path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 7
+
+      # 8. Upload aussi un APK debug pour test sur téléphone
+      - name: Flutter build APK debug
+        run: flutter build apk --debug
+
+      - name: Upload APK debug artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-${{ inputs.package_id }}
+          path: build/app/apk/debug/app-debug.apk
+          retention-days: 7
