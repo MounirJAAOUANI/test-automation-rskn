@@ -461,7 +461,7 @@ app.post("/api/agents/build-deploy", async (req, res) => {
     // 2. Poll for completion
     let attempts = 0;
     let status = "in_progress";
-    while (status === "in_progress" && attempts < 240) {
+    while (status === "in_progress" && attempts < 60) {
       await delay(5000);
       status = await githubLib.getWorkflowStatus(workflowRun.id);
       sse.log(`Build status: ${status} (${attempts * 5}s)...`);
