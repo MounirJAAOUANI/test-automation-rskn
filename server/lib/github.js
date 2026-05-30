@@ -93,7 +93,9 @@ async function triggerBuild({ appName, packageId, primaryColor }) {
     );
     const afterData = await afterRes.json();
     const runs = afterData.workflow_runs || [];
-    const fresh = runs.find((r) => !existingIds.has(r.id));
+    const fresh = runs.find(
+      (r) => !existingIds.has(r.id) && r.path === ".github/workflows/build.yml",
+    );
 
     if (fresh) {
       newRun = fresh;
@@ -275,7 +277,7 @@ async function uploadToPlayConsole({
 
   // 2. Upload AAB
   const { Readable } = require("stream");
-  await pub.edits.bundles.upload({
+  const uploadRes = await pub.edits.bundles.upload({
     packageName: packageId,
     editId,
     media: {
@@ -283,6 +285,8 @@ async function uploadToPlayConsole({
       body: Readable.from(aabBuffer),
     },
   });
+
+  const versionCode = uploadRes.data.versionCode;
 
   // 3. Listing fr-FR
   if (listing?.title) {
@@ -322,7 +326,7 @@ async function uploadToPlayConsole({
       releases: [
         {
           status: "draft",
-          versionCodes: [1], // ← entier, pas string
+          versionCodes: [versionCode], // ← entier, pas string
         },
       ],
     },
