@@ -434,9 +434,16 @@ app.post("/api/agents/build-deploy", async (req, res) => {
     screenshots,
   } = req.body;
 
+  // ── Mode développement — simulation ──────────────────────────────────────
   if (!IS_PROD) {
     sse.log("[DEV] Mode simulation — pas de build réel");
-    await delay(1500);
+    await delay(800);
+    sse.log("Simulation build Flutter...", "info");
+    await delay(600);
+    sse.log("Simulation upload Play Console...", "info");
+    await delay(400);
+    sse.log("Simulation Firebase Remote Config...", "info");
+    await delay(300);
     return sse.done({
       aabPath: "/tmp/app-release.aab",
       apkUrl: "#simulated",
@@ -447,77 +454,167 @@ app.post("/api/agents/build-deploy", async (req, res) => {
     });
   }
 
+  // ── Mode production ───────────────────────────────────────────────────────
   try {
+    // ── ÉTAPE 1 : Déclenchement GitHub Actions ──────────────────────────────
     sse.log("Préparation fichiers Flutter...");
-    // 1. Trigger GitHub Actions workflow
     sse.log("Déclenchement GitHub Actions (flutter build appbundle)...");
-    const workflowRun = await githubLib.triggerBuild({
-      appName,
-      packageId,
-      code,
-    });
-    sse.log(`Workflow ID: ${workflowRun.id} — en attente...`, "data");
 
-    // 2. Poll for completion
-    let attempts = 0;
-    let status = "in_progress";
-    while (status === "in_progress" && attempts < 60) {
-      await delay(5000);
-      status = await githubLib.getWorkflowStatus(workflowRun.id);
-      sse.log(`Build status: ${status} (${attempts * 5}s)...`);
-      attempts++;
+    let workflowRun;
+    try {
+      workflowRun = await githubLib.triggerBuild({
+        appName,
+        packageId,
+        primaryColor: code?.theme?.primaryColor || "7C3AED",
+      });
+    } catch (err) {
+      throw new Error(`Déclenchement GitHub Actions échoué : ${err.message}`);
     }
 
-    if (status !== "completed")
-      throw new Error("Build timeout — vérifiez GitHub Actions");
+    sse.log(
+      `Workflow ID: ${workflowRun.id} — en attente du démarrage...`,
+      "data",
+    );
+
+    // ── ÉTAPE 2 : Polling jusqu'à completion ────────────────────────────────
+    // Timeout : 60 tentatives × 10s = 10 minutes
+    let attempts = 0;
+    let status = "queued";
+
+    while ((status === "in_progress" || status === "queued") && attempts < 60) {
+      await delay(10000); // 10s entre chaque check
+      attempts++;
+
+      try {
+        status = await githubLib.getWorkflowStatus(workflowRun.id);
+      } catch (err) {
+        sse.log(`Erreur vérification statut (retry) : ${err.message}`, "warn");
+        continue;
+      }
+
+      const elapsedSec = attempts * 10;
+      const elapsedMin = Math.floor(elapsedSec / 60);
+      const remaining = elapsedSec % 60;
+      const timeStr =
+        elapsedMin > 0 ? `${elapsedMin}min ${remaining}s` : `${elapsedSec}s`;
+
+      sse.log(`Build status: ${status} (${timeStr} écoulés)...`);
+
+      if (status === "failure") {
+        throw new Error(
+          `GitHub Actions build échoué. ` +
+            `Consulte https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`,
+        );
+      }
+    }
+
+    if (status !== "completed") {
+      throw new Error(
+        `Build timeout après 10 minutes (run ID: ${workflowRun.id}). ` +
+          `Vérifie GitHub Actions : https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions`,
+      );
+    }
+
     sse.log("Build Flutter terminé ✅", "success");
 
-    // 3. Download AAB from artifacts
+    // ── ÉTAPE 3 : Téléchargement AAB ────────────────────────────────────────
     sse.log("Téléchargement AAB depuis GitHub Artifacts...");
-    const aabBuffer = await githubLib.downloadArtifact(
-      workflowRun.id,
-      "app-release.aab",
-    );
-    sse.log(
-      `AAB téléchargé: ${(aabBuffer.length / 1024 / 1024).toFixed(1)} MB`,
-      "success",
-    );
 
-    // 4. Setup Firebase Remote Config
-    sse.log("Configuration Firebase Remote Config...");
-    await firebaseLib.setupRemoteConfig(packageId, {
-      ads_banner_id: "ca-app-pub-3940256099942544/6300978111", // TEST ID
-      ads_interstitial_id: "ca-app-pub-3940256099942544/1033173712", // TEST ID
-      ads_rewarded_id: "ca-app-pub-3940256099942544/5224354917", // TEST ID
-      ads_enabled: "true",
-      interstitial_every_n: "3",
-      premium_price_usd: "4.99",
-      show_premium_cta: "true",
-    });
-    sse.log(
-      "Firebase Remote Config configuré — IDs AdMob modifiables sans republier ✅",
-      "success",
-    );
+    let aabBuffer;
+    try {
+      // IMPORTANT : le nom exact vient du build.yml
+      // step "Upload AAB artifact" → name: app-release-aab
+      aabBuffer = await githubLib.downloadArtifact(
+        workflowRun.id,
+        "app-release-aab",
+      );
+    } catch (err) {
+      throw new Error(`Téléchargement AAB échoué : ${err.message}`);
+    }
 
-    // 5. Upload to Play Console
+    const aabSizeMB = (aabBuffer.length / 1024 / 1024).toFixed(1);
+    sse.log(`AAB téléchargé : ${aabSizeMB} MB ✅`, "success");
+
+    // ── ÉTAPE 4 : URL de téléchargement APK debug ────────────────────────────
+    // L'APK debug est aussi un artifact GitHub — on construit l'URL directe
+    const apkArtifactName = "app-debug-apk";
+    let apkDownloadUrl = "#";
+    let apkSizeMB = "~45";
+
+    try {
+      const apkBuffer = await githubLib.downloadArtifact(
+        workflowRun.id,
+        apkArtifactName,
+      );
+      apkSizeMB = (apkBuffer.length / 1024 / 1024).toFixed(0);
+      // On ne télécharge pas le ZIP pour servir l'APK directement —
+      // on donne l'URL de téléchargement de l'artifact GitHub
+      apkDownloadUrl = `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}/artifacts`;
+      sse.log(`APK debug disponible : ${apkSizeMB} MB ✅`, "success");
+    } catch (apkErr) {
+      sse.log(
+        `APK debug non récupéré (non bloquant) : ${apkErr.message}`,
+        "warn",
+      );
+    }
+
+    // ── ÉTAPE 5 : Firebase Remote Config ────────────────────────────────────
+    sse.log("Configuration Firebase Remote Config (IDs AdMob)...");
+    try {
+      await firebaseLib.setupRemoteConfig(packageId, {
+        ads_banner_id: "ca-app-pub-3940256099942544/6300978111", // TEST
+        ads_interstitial_id: "ca-app-pub-3940256099942544/1033173712", // TEST
+        ads_rewarded_id: "ca-app-pub-3940256099942544/5224354917", // TEST
+        ads_enabled: "true",
+        interstitial_every_n: "3",
+        premium_price_usd: "4.99",
+        show_premium_cta: "true",
+      });
+      sse.log(
+        "Firebase Remote Config configuré ✅ (IDs AdMob modifiables sans republier)",
+        "success",
+      );
+    } catch (fbErr) {
+      // Non bloquant — l'app peut tourner sans Remote Config initialement
+      sse.log(
+        `Firebase Remote Config non configuré (non bloquant) : ${fbErr.message}`,
+        "warn",
+      );
+    }
+
+    // ── ÉTAPE 6 : Upload Play Console ────────────────────────────────────────
     sse.log("Upload AAB vers Play Console (draft)...");
-    const draft = await githubLib.uploadToPlayConsole({
-      packageId,
-      aabBuffer,
-      listing,
-      logoBase64,
-      screenshots,
-      policyUrl,
-    });
-    sse.log(`Draft créé sur Play Console ✅`, "success");
-    sse.log(`Track: internal | Status: DRAFT`, "data");
 
+    let draft;
+    try {
+      draft = await githubLib.uploadToPlayConsole({
+        packageId,
+        aabBuffer,
+        listing,
+        logoBase64,
+        screenshots,
+        policyUrl,
+      });
+    } catch (pcErr) {
+      throw new Error(`Upload Play Console échoué : ${pcErr.message}`);
+    }
+
+    sse.log("Draft créé sur Play Console ✅", "success");
+    sse.log("Track: internal | Status: DRAFT", "data");
+
+    const developerId = process.env.GOOGLE_PLAY_DEVELOPER_ID || "";
+    const consoleUrl = developerId
+      ? `https://play.google.com/console/u/0/developers/${developerId}/app-list`
+      : "https://play.google.com/console";
+
+    // ── DONE ─────────────────────────────────────────────────────────────────
     sse.done({
-      apkUrl: draft.apkDownloadUrl || "#",
+      apkUrl: apkDownloadUrl,
       apkName: `${packageId}-debug.apk`,
-      apkSize: `~${(aabBuffer.length / 1024 / 1024).toFixed(0)} MB`,
+      apkSize: `~${apkSizeMB} MB`,
       playConsoleStatus: "DRAFT",
-      draftUrl: `https://play.google.com/console/u/0/developers/${process.env.GOOGLE_PLAY_DEVELOPER_ID}/app/${draft.appId}/releases`,
+      draftUrl: consoleUrl,
+      workflowRunUrl: `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`,
     });
   } catch (err) {
     sse.fail(err);
