@@ -7,6 +7,7 @@ on:
       primary_color: { required: false, type: string, default: '#7C3AED' }
 jobs:
   build:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
