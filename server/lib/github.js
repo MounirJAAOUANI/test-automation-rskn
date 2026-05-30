@@ -140,11 +140,25 @@ async function triggerBuild({ appName, packageId, primaryColor }) {
   await new Promise((r) => setTimeout(r, 4000));
 
   const runsRes = await fetch(
-    `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs?per_page=1&branch=main`,
+    `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/build.yml/runs?per_page=10`,
     { headers: ghHeaders() },
   );
+
   const runs = await runsRes.json();
-  return runs.workflow_runs[0];
+
+  const run = runs.workflow_runs.find((r) => r.event === "workflow_dispatch");
+
+  return run;
+
+  // const runsRes = await fetch(
+  //   `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs?per_page=1&branch=main`,
+  //   { headers: ghHeaders() },
+  // );
+  // const runs = await runsRes.json();
+  // return runs.workflow_runs[0];
+
+  console.log("Workflow run selected:", runs.workflow_runs[0].id);
+  console.log("Run selected:", run.id);
 }
 
 // ─── GET WORKFLOW STATUS ─────────────────────────────────────────────────────
@@ -158,6 +172,15 @@ async function getWorkflowStatus(runId) {
     { headers: ghHeaders() },
   );
   const data = await res.json();
+  console.log("jsonStringify : ", JSON.stringify(data, null, 2));
+  console.log(
+    "GitHub run:",
+    runId,
+    "status=",
+    data.status,
+    "conclusion=",
+    data.conclusion,
+  );
 
   if (data.status === "completed") {
     return data.conclusion === "success" ? "completed" : "failure";
@@ -226,7 +249,7 @@ async function uploadToPlayConsole({
 
   // 2. Upload AAB
   const { Readable } = require("stream");
-  await publisher.edits.bundles.upload({
+  const bundle = await publisher.edits.bundles.upload({
     packageName: packageId,
     editId,
     media: {
@@ -234,6 +257,8 @@ async function uploadToPlayConsole({
       body: Readable.from(aabBuffer),
     },
   });
+
+  console.log("Bundle upload:", bundle.data);
 
   // 3. Listing français
   if (listing?.title) {
@@ -269,7 +294,9 @@ async function uploadToPlayConsole({
     editId,
     track: "internal",
     requestBody: {
-      releases: [{ status: "draft", versionCodes: ["1"] }],
+      releases: [
+        { status: "draft", versionCodes: [String(bundle.data.versionCode)] },
+      ],
     },
   });
 
