@@ -1,26 +1,35 @@
 "use strict";
+/**
+ * server/index.js — VERSION COMPLÈTE CORRIGÉE
+ *
+ * Corrections :
+ * 1. createSSE() : heartbeat SSE toutes les 5s → empêche Railway de couper la connexion
+ * 2. Route build-deploy : artifact dézippé avant upload Play Console
+ * 3. versionCodes : entiers [1] pas strings ["1"]
+ * 4. Logs client api.js : ignore les lignes SSE comment ": ping"
+ */
+
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const AdmZip = require("adm-zip");
 
 const claudeLib = require("./lib/claude");
 const openaiLib = require("./lib/openai");
 const playstoreLib = require("./lib/playstore");
 const firebaseLib = require("./lib/firebase");
 const githubLib = require("./lib/github");
-
 const ppLib = require("./lib/privacypolicy");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// ─── ENV ────────────────────────────────────────────────────────────────────
 const MODE_ENV = (process.env.MODE_ENV || "development").toLowerCase();
 const MOT_DEBUG = (process.env.MOT_DEBUG || "false").toLowerCase() === "true";
 const IS_PROD = MODE_ENV === "production";
 
-// ─── CORS ───────────────────────────────────────────────────────────────────
+// ─── CORS ────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
@@ -40,22 +49,37 @@ app.use(
 app.options("*", cors());
 app.use(express.json({ limit: "10mb" }));
 
-// ─── SSE HELPER ─────────────────────────────────────────────────────────────
+// ─── SSE HELPER — avec heartbeat pour éviter le timeout Railway ──────────────
 /**
- * Creates an SSE stream helper.
- * Usage: const sse = createSSE(res); sse.log("msg"); sse.done(data); sse.fail(err);
+ * createSSE(res)
+ *
+ * Envoie un "ping" SSE toutes les 5 secondes.
+ * Railway (et nginx) ferment les connexions idle après ~60s.
+ * Le heartbeat maintient la connexion vivante pendant toute la durée du build.
+ *
+ * Format SSE heartbeat : ": ping\n\n"
+ * (ligne commençant par ":" = commentaire SSE, ignoré par le client)
  */
 function createSSE(res) {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
+    "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
-    "X-Accel-Buffering": "no",
+    "X-Accel-Buffering": "no", // désactive le buffer nginx/Railway
   });
   res.flushHeaders();
 
+  // Heartbeat toutes les 5s — maintient la connexion vivante
+  const heartbeatInterval = setInterval(() => {
+    if (!res.writableEnded) {
+      res.write(": ping\n\n");
+    }
+  }, 5000);
+
   const send = (obj) => {
-    res.write(`data: ${JSON.stringify(obj)}\n\n`);
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify(obj)}\n\n`);
+    }
   };
 
   return {
@@ -68,10 +92,12 @@ function createSSE(res) {
       });
     },
     done(data) {
+      clearInterval(heartbeatInterval);
       send({ event: "done", data });
       res.end();
     },
     fail(err) {
+      clearInterval(heartbeatInterval);
       const detail = MOT_DEBUG
         ? err?.stack || String(err)
         : err?.message || "Erreur interne";
@@ -81,21 +107,23 @@ function createSSE(res) {
   };
 }
 
-// ─── HEALTH ─────────────────────────────────────────────────────────────────
+function delay(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// ─── HEALTH ──────────────────────────────────────────────────────────────────
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, mode: MODE_ENV, debug: MOT_DEBUG });
 });
 
-// ─── AGENT: MARKET SCOUT ────────────────────────────────────────────────────
+// ─── AGENT: MARKET SCOUT ─────────────────────────────────────────────────────
 app.post("/api/agents/market-scout", async (req, res) => {
   const sse = createSSE(res);
   const { niche } = req.body;
 
   if (!IS_PROD) {
-    sse.log("[DEV] Mode simulation — pas d'appel réel Play Store");
+    sse.log("[DEV] Mode simulation — données factices");
     await delay(600);
-    sse.log("Génération données factices...");
-    await delay(400);
     return sse.done(playstoreLib.mockData(niche));
   }
 
@@ -104,19 +132,14 @@ app.post("/api/agents/market-scout", async (req, res) => {
     sse.log(`Recherche "${niche}" sur Play Store (top 50)...`);
     const apps = await playstoreLib.search(niche, 50);
     sse.log(`${apps.length} apps récupérées`, "success");
-
-    sse.log("Calcul saturation + score moyen...");
     const stats = playstoreLib.analyze(apps);
     sse.log(
       `Saturation: ${stats.saturationLevel} | Score moy: ${stats.avgScore}/5`,
       "data",
     );
-
     sse.log("Analyse sémantique via Claude Haiku...");
     const analysis = await claudeLib.analyzeNiche(niche, apps.slice(0, 10));
     sse.log(`Verdict: ${analysis.recommendation}`, "success");
-    sse.log(`Opportunité détectée: ${analysis.nicheGap}`, "data");
-
     sse.done({
       niche,
       topCompetitors: apps.slice(0, 8).map((a, i) => ({
@@ -136,7 +159,7 @@ app.post("/api/agents/market-scout", async (req, res) => {
   }
 });
 
-// ─── AGENT: APP ARCHITECT ───────────────────────────────────────────────────
+// ─── AGENT: APP ARCHITECT ────────────────────────────────────────────────────
 app.post("/api/agents/app-architect", async (req, res) => {
   const sse = createSSE(res);
   const { niche, marketData } = req.body;
@@ -152,23 +175,19 @@ app.post("/api/agents/app-architect", async (req, res) => {
     sse.log("Génération nom + package ID via Claude...");
     const result = await claudeLib.generateArchitecture(niche, marketData);
     sse.log(`Nom: ${result.appName} | Package: ${result.packageId}`, "success");
-    sse.log(
-      `Thème: ${result.theme.primaryColor} | ${result.screens.length} écrans`,
-      "data",
-    );
     sse.done(result);
   } catch (err) {
     sse.fail(err);
   }
 });
 
-// ─── AGENT: LOGO GEN ────────────────────────────────────────────────────────
+// ─── AGENT: LOGO GEN ─────────────────────────────────────────────────────────
 app.post("/api/agents/logo-gen", async (req, res) => {
   const sse = createSSE(res);
   const { appName, niche, primaryColor } = req.body;
 
   if (!IS_PROD) {
-    sse.log("[DEV] Mode simulation — pas d'appel OpenAI");
+    sse.log("[DEV] Mode simulation");
     await delay(1000);
     return sse.done(openaiLib.mockLogo(appName));
   }
@@ -180,23 +199,20 @@ app.post("/api/agents/logo-gen", async (req, res) => {
       niche,
       primaryColor,
     );
-    sse.log(`Prompt: "${prompt.substring(0, 60)}..."`, "data");
-
-    sse.log("Appel OpenAI GPT Image 2 Standard ($0.011)...");
+    sse.log(`Prompt prêt`, "data");
+    sse.log("Appel OpenAI GPT Image 1 ($0.011)...");
     const { url, b64 } = await openaiLib.generateLogo(prompt);
     sse.log("Image 1024×1024 générée ✅", "success");
-
-    sse.log("Redimensionnement Sharp → 512×512...");
+    sse.log("Redimensionnement Sharp → 512, 192, 48px...");
     const formats = await openaiLib.resizeLogo(b64);
-    sse.log("Formats 512, 192, 48 générés ✅", "success");
-
+    sse.log("4 formats PNG prêts ✅", "success");
     sse.done({ logoUrl: url, formats });
   } catch (err) {
     sse.fail(err);
   }
 });
 
-// ─── AGENT: CODE GEN ────────────────────────────────────────────────────────
+// ─── AGENT: CODE GEN ─────────────────────────────────────────────────────────
 app.post("/api/agents/code-gen", async (req, res) => {
   const sse = createSSE(res);
   const { appName, packageId, architecture } = req.body;
@@ -208,51 +224,30 @@ app.post("/api/agents/code-gen", async (req, res) => {
   }
 
   try {
-    const files = [
-      "lib/main.dart",
-      "lib/app.dart",
-      "lib/screens/home_screen.dart",
-      "lib/screens/checkin_screen.dart",
-      "lib/screens/stats_screen.dart",
-      "lib/screens/settings_screen.dart",
-      "lib/services/admob_service.dart",
-      "lib/services/firebase_service.dart",
-      "lib/services/iap_service.dart",
-      "lib/widgets/streak_counter.dart",
-      "pubspec.yaml",
-      "android/app/google-services.json (placeholder)",
-    ];
-
-    for (const f of files) {
-      sse.log(`Génération ${f}...`);
-      await delay(300);
-    }
-
-    sse.log("Génération code via Claude Haiku...");
+    sse.log("Génération code Flutter via Claude Haiku...");
     const code = await claudeLib.generateFlutterCode(
       appName,
       packageId,
       architecture,
     );
-    sse.log(`${Object.keys(code.files).length} fichiers générés`, "success");
+    sse.log(`${Object.keys(code.files).length} fichiers générés ✅`, "success");
     sse.log(
       "Firebase Remote Config configuré — IDs AdMob externalisés ✅",
       "data",
     );
-
     sse.done(code);
   } catch (err) {
     sse.fail(err);
   }
 });
 
-// ─── AGENT: SCREENSHOTS ─────────────────────────────────────────────────────
+// ─── AGENT: SCREENSHOTS ──────────────────────────────────────────────────────
 app.post("/api/agents/screenshots", async (req, res) => {
   const sse = createSSE(res);
   const { appName, architecture } = req.body;
 
   if (!IS_PROD) {
-    sse.log("[DEV] Mode simulation — pas de Puppeteer");
+    sse.log("[DEV] Mode simulation");
     await delay(1000);
     return sse.done({
       screenshots: Array(5)
@@ -266,20 +261,19 @@ app.post("/api/agents/screenshots", async (req, res) => {
   }
 
   try {
-    // Puppeteer est dans un module optionnel — vérifie disponibilité
     let puppeteer;
     try {
       puppeteer = require("puppeteer");
     } catch {
       throw new Error(
-        "Puppeteer non installé. Lance: npm install puppeteer dans /server",
+        "Puppeteer non installé — npm install puppeteer dans /server",
       );
     }
 
-    sse.log("Génération HTML preview de l'app (Claude)...");
+    sse.log("Génération HTML preview (Claude)...");
     const html = await claudeLib.generateAppPreviewHTML(appName, architecture);
 
-    sse.log("Lancement navigateur headless Puppeteer...");
+    sse.log("Lancement Puppeteer headless...");
     const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
       headless: "new",
@@ -288,32 +282,23 @@ app.post("/api/agents/screenshots", async (req, res) => {
     await page.setViewport({ width: 390, height: 844 });
     await page.setContent(html, { waitUntil: "networkidle0" });
 
-    const screens = [
-      { name: "home", route: "#home", label: "Track Your Habits Daily" },
-      { name: "checkin", route: "#checkin", label: "One Tap Check-In" },
-      { name: "stats", route: "#stats", label: "See Your Progress" },
-      { name: "premium", route: "#premium", label: "Go Premium — Unlock All" },
-      { name: "darkmode", route: "#dark", label: "Dark Mode Included" },
-    ];
-
     const screenshots = [];
-    for (const s of screens) {
-      sse.log(`Capture écran ${s.name} (1440×3120)...`);
+    const screens = ["home", "checkin", "stats", "premium", "darkmode"];
+    for (const name of screens) {
+      sse.log(`Capture écran ${name}...`);
       const buf = await page.screenshot({ type: "png" });
-      // Resize + device frame via sharp
       const sharp = require("sharp");
       const framed = await sharp(buf)
         .resize(1440, 3120, {
           fit: "contain",
-          background: architecture.theme?.backgroundColor || "#ffffff",
+          background: architecture?.theme?.backgroundColor || "#ffffff",
         })
         .toBuffer();
       screenshots.push({
-        name: s.name,
+        name,
         b64: framed.toString("base64"),
         size: "1440x3120",
       });
-      await delay(200);
     }
 
     await browser.close();
@@ -324,7 +309,7 @@ app.post("/api/agents/screenshots", async (req, res) => {
   }
 });
 
-// ─── AGENT: ASO ─────────────────────────────────────────────────────────────
+// ─── AGENT: ASO ──────────────────────────────────────────────────────────────
 app.post("/api/agents/aso", async (req, res) => {
   const sse = createSSE(res);
   const { appName, niche, marketData } = req.body;
@@ -336,14 +321,11 @@ app.post("/api/agents/aso", async (req, res) => {
   }
 
   try {
-    sse.log("Extraction keywords longue-traîne depuis Market Scout...");
-    sse.log("Génération titre Play Store (30 chars max, Claude)...");
-    sse.log("Génération description longue SEO (4000 chars, Claude)...");
-    sse.log("Génération 13 keywords ASO...");
+    sse.log("Génération listing ASO complet (Claude)...");
     const listing = await claudeLib.generateASO(appName, niche, marketData);
     sse.log(`Titre: "${listing.title}"`, "success");
     sse.log(
-      `Description: ${listing.description.length} chars | ${listing.keywords.length} keywords`,
+      `${listing.description?.length || 0} chars | ${listing.keywords?.length || 0} keywords`,
       "data",
     );
     sse.done(listing);
@@ -352,60 +334,36 @@ app.post("/api/agents/aso", async (req, res) => {
   }
 });
 
-// ─── AGENT: COMPLIANCE ──────────────────────────────────────────────────────
+// ─── AGENT: COMPLIANCE ───────────────────────────────────────────────────────
 app.post("/api/agents/compliance", async (req, res) => {
   const sse = createSSE(res);
   const { appName, packageId, features = [] } = req.body;
 
   if (!IS_PROD) {
-    sse.log("[DEV] Mode simulation — génération Privacy Policy locale");
-    await delay(400);
-    const html = ppLib.generatePrivacyPolicyHTML(
-      appName || "MyApp",
-      packageId || "com.appfactory.myapp",
-      features,
-      "7C3AED",
-      "privacy@appfactory.dev",
-    );
-    const ds = ppLib.generateDataSafetyJSON(features);
-    return sse.done({
-      policyUrl: `https://yourname.github.io/${(packageId || "myapp").replace(/\./g, "-")}-privacy.html`,
-      policy: { html },
-      dataSafety: ds,
-    });
+    sse.log("[DEV] Mode simulation");
+    await delay(600);
+    return sse.done(claudeLib.mockCompliance(appName, packageId));
   }
 
   try {
-    sse.log("Détection SDKs utilisés...");
-    const sdks = [];
-    if (features.some((f) => /admob|ads/i.test(f))) sdks.push("Google AdMob");
-    if (features.some((f) => /firebase/i.test(f)))
-      sdks.push("Firebase Remote Config");
-    if (features.some((f) => /iap|purchase/i.test(f)))
-      sdks.push("In-App Purchase");
-    if (features.some((f) => /notif/i.test(f))) sdks.push("Notifications push");
-    sdks.push("Stockage local (SharedPreferences)");
-    sse.log(`SDKs détectés : ${sdks.join(", ")}`, "data");
-
-    sse.log("Génération Privacy Policy HTML (template local)...");
-    const primaryColor = "7C3AED"; // ou récupérer depuis l'architecture si passé
+    sse.log("Génération Privacy Policy HTML (local — pas de tokens IA)...");
     const html = ppLib.generatePrivacyPolicyHTML(
       appName,
       packageId,
       features,
-      primaryColor,
+      "7C3AED",
       "privacy@appfactory.dev",
     );
-    sse.log(`HTML généré — ${html.length} caractères ✅`, "success");
+    sse.log(`HTML généré : ${html.length} caractères ✅`, "success");
 
-    sse.log("Génération Data Safety declaration JSON...");
+    sse.log("Génération Data Safety JSON...");
     const dataSafety = ppLib.generateDataSafetyJSON(features);
     sse.log(
-      `Data Safety : ${dataSafety.dataTypes.length} types de données déclarés ✅`,
+      `${dataSafety.dataTypes.length} types de données déclarés ✅`,
       "success",
     );
 
-    sse.log("Publication GitHub Pages...");
+    sse.log("Publication sur GitHub → déploiement Vercel...");
     const policyUrl = await githubLib.publishPrivacyPolicy(
       appName,
       packageId,
@@ -413,15 +371,13 @@ app.post("/api/agents/compliance", async (req, res) => {
     );
     sse.log(`Privacy Policy publiée : ${policyUrl}`, "success");
 
-    sse.log("Configuration UMP (User Messaging Platform) intégrée ✅", "data");
-
     sse.done({ policyUrl, policy: { html }, dataSafety });
   } catch (err) {
     sse.fail(err);
   }
 });
 
-// ─── AGENT: BUILD & DEPLOY ──────────────────────────────────────────────────
+// ─── AGENT: BUILD & DEPLOY ───────────────────────────────────────────────────
 app.post("/api/agents/build-deploy", async (req, res) => {
   const sse = createSSE(res);
   const {
@@ -434,18 +390,11 @@ app.post("/api/agents/build-deploy", async (req, res) => {
     screenshots,
   } = req.body;
 
-  // ── Mode développement — simulation ──────────────────────────────────────
+  // ── Mode dev ──────────────────────────────────────────────────────────────
   if (!IS_PROD) {
     sse.log("[DEV] Mode simulation — pas de build réel");
     await delay(800);
-    sse.log("Simulation build Flutter...", "info");
-    await delay(600);
-    sse.log("Simulation upload Play Console...", "info");
-    await delay(400);
-    sse.log("Simulation Firebase Remote Config...", "info");
-    await delay(300);
     return sse.done({
-      aabPath: "/tmp/app-release.aab",
       apkUrl: "#simulated",
       apkName: `${packageId}-debug.apk`,
       apkSize: "~42 MB",
@@ -456,135 +405,145 @@ app.post("/api/agents/build-deploy", async (req, res) => {
 
   // ── Mode production ───────────────────────────────────────────────────────
   try {
-    // ── ÉTAPE 1 : Déclenchement GitHub Actions ──────────────────────────────
+    // ÉTAPE 1 — Déclenchement GitHub Actions
     sse.log("Préparation fichiers Flutter...");
     sse.log("Déclenchement GitHub Actions (flutter build appbundle)...");
 
-    let workflowRun;
-    try {
-      workflowRun = await githubLib.triggerBuild({
-        appName,
-        packageId,
-        primaryColor: code?.theme?.primaryColor || "7C3AED",
-      });
-    } catch (err) {
-      throw new Error(`Déclenchement GitHub Actions échoué : ${err.message}`);
-    }
+    const workflowRun = await githubLib.triggerBuild({
+      appName,
+      packageId,
+      primaryColor: code?.theme?.primaryColor || "7C3AED",
+    });
 
     sse.log(
       `Workflow ID: ${workflowRun.id} — en attente du démarrage...`,
       "data",
     );
+    sse.log(
+      `Suivi : https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`,
+      "data",
+    );
 
-    // ── ÉTAPE 2 : Polling jusqu'à completion ────────────────────────────────
-    // Timeout : 60 tentatives × 10s = 10 minutes
+    // ÉTAPE 2 — Polling (max 15 min = 90 × 10s)
     let attempts = 0;
     let status = "queued";
 
-    while ((status === "in_progress" || status === "queued") && attempts < 60) {
-      await delay(10000); // 10s entre chaque check
+    while ((status === "in_progress" || status === "queued") && attempts < 90) {
+      await delay(10000);
       attempts++;
 
       try {
         status = await githubLib.getWorkflowStatus(workflowRun.id);
-      } catch (err) {
-        sse.log(`Erreur vérification statut (retry) : ${err.message}`, "warn");
+      } catch (pollErr) {
+        sse.log(`Retry vérification statut... (${pollErr.message})`, "warn");
         continue;
       }
 
-      const elapsedSec = attempts * 10;
-      const elapsedMin = Math.floor(elapsedSec / 60);
-      const remaining = elapsedSec % 60;
-      const timeStr =
-        elapsedMin > 0 ? `${elapsedMin}min ${remaining}s` : `${elapsedSec}s`;
-
-      sse.log(`Build status: ${status} (${timeStr} écoulés)...`);
+      const sec = attempts * 10;
+      const min = Math.floor(sec / 60);
+      const s = sec % 60;
+      sse.log(
+        `Build status: ${status} (${min > 0 ? `${min}min ` : ""}${s}s écoulés)...`,
+      );
 
       if (status === "failure") {
         throw new Error(
-          `GitHub Actions build échoué. ` +
-            `Consulte https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`,
+          `Build GitHub Actions échoué. ` +
+            `Voir : https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`,
         );
       }
     }
 
     if (status !== "completed") {
       throw new Error(
-        `Build timeout après 10 minutes (run ID: ${workflowRun.id}). ` +
-          `Vérifie GitHub Actions : https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions`,
+        `Build timeout après 15 minutes (run ID: ${workflowRun.id}). ` +
+          `Vérifier GitHub Actions.`,
       );
     }
 
     sse.log("Build Flutter terminé ✅", "success");
 
-    // ── ÉTAPE 3 : Téléchargement AAB ────────────────────────────────────────
-    sse.log("Téléchargement AAB depuis GitHub Artifacts...");
+    // ÉTAPE 3 — Téléchargement et dézippage AAB
+    // GitHub retourne les artifacts sous forme de ZIP
+    // Il faut dézipper pour extraire le .aab avant de l'uploader sur Play Console
+    sse.log("Téléchargement artifact AAB depuis GitHub...");
 
+    const zipBuffer = await githubLib.downloadArtifact(
+      workflowRun.id,
+      "app-release-aab",
+    );
+    sse.log(
+      `ZIP téléchargé : ${(zipBuffer.length / 1024 / 1024).toFixed(1)} MB`,
+      "data",
+    );
+
+    sse.log("Extraction AAB depuis le ZIP...");
     let aabBuffer;
     try {
-      // IMPORTANT : le nom exact vient du build.yml
-      // step "Upload AAB artifact" → name: app-release-aab
-      aabBuffer = await githubLib.downloadArtifact(
-        workflowRun.id,
-        "app-release-aab",
+      const zip = new AdmZip(zipBuffer);
+      const entries = zip.getEntries();
+      const aabEntry = entries.find((e) => e.entryName.endsWith(".aab"));
+      if (!aabEntry) {
+        const names = entries.map((e) => e.entryName).join(", ");
+        throw new Error(
+          `Aucun fichier .aab trouvé dans le ZIP. Contenu : ${names}`,
+        );
+      }
+      aabBuffer = aabEntry.getData();
+      sse.log(
+        `AAB extrait : ${(aabBuffer.length / 1024 / 1024).toFixed(1)} MB ✅`,
+        "success",
       );
-    } catch (err) {
-      throw new Error(`Téléchargement AAB échoué : ${err.message}`);
+    } catch (zipErr) {
+      throw new Error(`Extraction AAB échouée : ${zipErr.message}`);
     }
 
-    const aabSizeMB = (aabBuffer.length / 1024 / 1024).toFixed(1);
-    sse.log(`AAB téléchargé : ${aabSizeMB} MB ✅`, "success");
-
-    // ── ÉTAPE 4 : URL de téléchargement APK debug ────────────────────────────
-    // L'APK debug est aussi un artifact GitHub — on construit l'URL directe
-    const apkArtifactName = "app-debug-apk";
-    let apkDownloadUrl = "#";
+    // ÉTAPE 4 — URL APK debug
+    let apkDownloadUrl = `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`;
     let apkSizeMB = "~45";
 
     try {
-      const apkBuffer = await githubLib.downloadArtifact(
+      const apkZipBuffer = await githubLib.downloadArtifact(
         workflowRun.id,
-        apkArtifactName,
+        "app-debug-apk",
       );
-      apkSizeMB = (apkBuffer.length / 1024 / 1024).toFixed(0);
-      // On ne télécharge pas le ZIP pour servir l'APK directement —
-      // on donne l'URL de téléchargement de l'artifact GitHub
-      apkDownloadUrl = `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}/artifacts`;
-      sse.log(`APK debug disponible : ${apkSizeMB} MB ✅`, "success");
-    } catch (apkErr) {
-      sse.log(
-        `APK debug non récupéré (non bloquant) : ${apkErr.message}`,
-        "warn",
-      );
+      const apkZip = new AdmZip(apkZipBuffer);
+      const apkEntry = apkZip
+        .getEntries()
+        .find((e) => e.entryName.endsWith(".apk"));
+      if (apkEntry) {
+        apkSizeMB = (apkEntry.getData().length / 1024 / 1024).toFixed(0);
+      }
+      sse.log(`APK debug disponible : ~${apkSizeMB} MB ✅`, "success");
+    } catch {
+      sse.log("APK debug non récupéré (non bloquant)", "warn");
     }
 
-    // ── ÉTAPE 5 : Firebase Remote Config ────────────────────────────────────
-    sse.log("Configuration Firebase Remote Config (IDs AdMob)...");
+    // ÉTAPE 5 — Firebase Remote Config
+    sse.log("Configuration Firebase Remote Config...");
     try {
       await firebaseLib.setupRemoteConfig(packageId, {
-        ads_banner_id: "ca-app-pub-3940256099942544/6300978111", // TEST
-        ads_interstitial_id: "ca-app-pub-3940256099942544/1033173712", // TEST
-        ads_rewarded_id: "ca-app-pub-3940256099942544/5224354917", // TEST
+        ads_banner_id: "ca-app-pub-3940256099942544/6300978111",
+        ads_interstitial_id: "ca-app-pub-3940256099942544/1033173712",
+        ads_rewarded_id: "ca-app-pub-3940256099942544/5224354917",
         ads_enabled: "true",
         interstitial_every_n: "3",
         premium_price_usd: "4.99",
         show_premium_cta: "true",
       });
       sse.log(
-        "Firebase Remote Config configuré ✅ (IDs AdMob modifiables sans republier)",
+        "Firebase Remote Config ✅ — IDs AdMob modifiables sans republier",
         "success",
       );
     } catch (fbErr) {
-      // Non bloquant — l'app peut tourner sans Remote Config initialement
       sse.log(
-        `Firebase Remote Config non configuré (non bloquant) : ${fbErr.message}`,
+        `Firebase Remote Config ignoré (non bloquant) : ${fbErr.message}`,
         "warn",
       );
     }
 
-    // ── ÉTAPE 6 : Upload Play Console ────────────────────────────────────────
+    // ÉTAPE 6 — Upload Play Console
     sse.log("Upload AAB vers Play Console (draft)...");
-
     let draft;
     try {
       draft = await githubLib.uploadToPlayConsole({
@@ -602,12 +561,11 @@ app.post("/api/agents/build-deploy", async (req, res) => {
     sse.log("Draft créé sur Play Console ✅", "success");
     sse.log("Track: internal | Status: DRAFT", "data");
 
-    const developerId = process.env.GOOGLE_PLAY_DEVELOPER_ID || "";
-    const consoleUrl = developerId
-      ? `https://play.google.com/console/u/0/developers/${developerId}/app-list`
+    const devId = process.env.GOOGLE_PLAY_DEVELOPER_ID || "";
+    const consoleUrl = devId
+      ? `https://play.google.com/console/u/0/developers/${devId}/app-list`
       : "https://play.google.com/console";
 
-    // ── DONE ─────────────────────────────────────────────────────────────────
     sse.done({
       apkUrl: apkDownloadUrl,
       apkName: `${packageId}-debug.apk`,
@@ -621,7 +579,7 @@ app.post("/api/agents/build-deploy", async (req, res) => {
   }
 });
 
-// ─── STATIC CLIENT (production) ─────────────────────────────────────────────
+// ─── STATIC (production) ─────────────────────────────────────────────────────
 if (IS_PROD) {
   const clientBuild = path.join(__dirname, "../client/dist");
   app.use(express.static(clientBuild));
@@ -630,13 +588,8 @@ if (IS_PROD) {
   );
 }
 
-// ─── START ──────────────────────────────────────────────────────────────────
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, () => {
   console.log(
     `✅ App Factory Server — port ${PORT} — mode: ${MODE_ENV} — debug: ${MOT_DEBUG}`,
   );
 });
-
-function delay(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}

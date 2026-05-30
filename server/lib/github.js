@@ -3,16 +3,18 @@
  * server/lib/github.js — VERSION CORRIGÉE
  *
  * Corrections :
- * 1. triggerBuild() : récupère les IDs existants AVANT de déclencher,
- *    puis attend que le NOUVEAU run apparaisse → ID garanti correct
- * 2. downloadArtifact() : utilise le bon nom "app-release-aab"
- * 3. Gestion d'erreur explicite à chaque étape
+ * 1. repoPath = policies/${fileName}  (fichier dans sous-dossier du repo)
+ * 2. triggerBuild() : snapshot IDs avant dispatch → récupère le bon runId
+ * 3. downloadArtifact() : retourne le ZIP brut (dézippage dans index.js avec adm-zip)
+ * 4. uploadToPlayConsole() : versionCodes = [1] (entiers, pas strings)
  *
- * Variables d'env requises :
- *   GITHUB_TOKEN         → ghp_...
- *   GITHUB_OWNER         → ex: MounirJAAOUANI
- *   GITHUB_REPO          → ex: test-automation-rskn
- *   VERCEL_PROJECT_URL   → ex: https://test-automation-rskn.vercel.app
+ * Variables d'env Railway requises :
+ *   GITHUB_TOKEN         ghp_...
+ *   GITHUB_OWNER         ex: MounirJAAOUANI
+ *   GITHUB_REPO          ex: test-automation-rskn
+ *   VERCEL_PROJECT_URL   ex: https://test-automation-rskn.vercel.app
+ *   GOOGLE_PLAY_SERVICE_ACCOUNT  JSON minifié
+ *   GOOGLE_PLAY_DEVELOPER_ID     ID numérique développeur
  */
 
 const fetch = require("node-fetch");
@@ -24,10 +26,9 @@ const VERCEL_PROJECT_URL = (process.env.VERCEL_PROJECT_URL || "").replace(
   /\/$/,
   "",
 );
-
 const GH_API = "https://api.github.com";
 
-// ─── HEADERS ────────────────────────────────────────────────────────────────
+// ─── HEADERS ─────────────────────────────────────────────────────────────────
 function ghHeaders() {
   return {
     Authorization: `Bearer ${GITHUB_TOKEN}`,
@@ -37,44 +38,27 @@ function ghHeaders() {
   };
 }
 
-// ─── HELPER — fetch avec log d'erreur précis ─────────────────────────────────
-async function ghFetch(url, options = {}) {
-  const res = await fetch(url, { ...options, headers: ghHeaders() });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(
-      `GitHub API ${options.method || "GET"} ${url} → ${res.status}: ${body}`,
-    );
-  }
-  return res;
-}
-
-// ─── TRIGGER BUILD + RÉCUPÉRER LE BON RUN ID ─────────────────────────────────
+// ─── TRIGGER BUILD — récupère le bon runId ───────────────────────────────────
 /**
- * Déclenche le workflow et retourne UNIQUEMENT le run qui vient d'être créé.
- *
- * Stratégie fiable :
- * 1. Capture les IDs des runs existants AVANT déclenchement
- * 2. Déclenche le workflow
- * 3. Polling jusqu'à ce qu'un run avec un ID NOUVEAU apparaisse
- * 4. Retourne ce run → ID garanti correct
- *
- * @param {{ appName, packageId, primaryColor }} params
- * @returns {object} — le workflow run (avec .id correct)
+ * Stratégie fiable pour obtenir le runId du build qu'on vient de déclencher :
+ *  1. Capture les runIds existants AVANT le dispatch
+ *  2. Dispatche le workflow
+ *  3. Poll toutes les 3s jusqu'à voir un runId NOUVEAU
  */
 async function triggerBuild({ appName, packageId, primaryColor }) {
-  // 1. Snapshot des runs EXISTANTS avant déclenchement
-  const existingRes = await ghFetch(
+  // 1. Snapshot des runs existants
+  const beforeRes = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs?per_page=10&branch=main`,
+    { headers: ghHeaders() },
   );
-  const existingData = await existingRes.json();
+  const beforeData = await beforeRes.json();
   const existingIds = new Set(
-    (existingData.workflow_runs || []).map((r) => r.id),
+    (beforeData.workflow_runs || []).map((r) => r.id),
   );
 
-  // 2. Déclencher le workflow
-  const cleanColor = (primaryColor || "7C3AED").replace("#", "");
-  const triggerRes = await fetch(
+  // 2. Dispatch
+  const cleanColor = (primaryColor || "7C3AED").replace(/#/g, "");
+  const trigRes = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/build.yml/dispatches`,
     {
       method: "POST",
@@ -90,27 +74,27 @@ async function triggerBuild({ appName, packageId, primaryColor }) {
     },
   );
 
-  if (!triggerRes.ok) {
-    const errText = await triggerRes.text();
+  if (!trigRes.ok) {
+    const errText = await trigRes.text();
     throw new Error(
-      `GitHub Actions trigger failed (${triggerRes.status}): ${errText}`,
+      `GitHub Actions dispatch failed (${trigRes.status}): ${errText}\n` +
+        `Vérifiez que GITHUB_TOKEN a le scope "workflow" et que build.yml existe dans le repo.`,
     );
   }
 
-  // 3. Polling — attendre qu'un run NOUVEAU apparaisse (max 30s)
-  //    GitHub peut prendre 2-8s pour enregistrer le run après dispatch
+  // 3. Polling — attendre qu'un runId nouveau apparaisse (max 36s)
   let newRun = null;
   for (let i = 0; i < 12; i++) {
-    await new Promise((r) => setTimeout(r, 3000)); // attendre 3s entre chaque check
+    await new Promise((r) => setTimeout(r, 3000));
 
-    const runsRes = await ghFetch(
+    const afterRes = await fetch(
       `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs?per_page=10&branch=main`,
+      { headers: ghHeaders() },
     );
-    const runsData = await runsRes.json();
-    const runs = runsData.workflow_runs || [];
-
-    // Chercher un run dont l'ID n'était pas dans la liste initiale
+    const afterData = await afterRes.json();
+    const runs = afterData.workflow_runs || [];
     const fresh = runs.find((r) => !existingIds.has(r.id));
+
     if (fresh) {
       newRun = fresh;
       break;
@@ -119,23 +103,26 @@ async function triggerBuild({ appName, packageId, primaryColor }) {
 
   if (!newRun) {
     throw new Error(
-      "Impossible de trouver le run GitHub Actions après déclenchement. " +
-        "Vérifiez que le workflow build.yml existe et que GITHUB_TOKEN a les permissions 'workflow'.",
+      "Impossible de trouver le nouveau run GitHub Actions après déclenchement. " +
+        "Vérifiez que GITHUB_TOKEN a le scope 'workflow' et que le fichier " +
+        ".github/workflows/build.yml existe dans le repo.",
     );
   }
 
   return newRun;
 }
 
-// ─── GET WORKFLOW STATUS ─────────────────────────────────────────────────────
-/**
- * @param {number|string} runId
- * @returns {"queued"|"in_progress"|"completed"|"failure"}
- */
+// ─── GET WORKFLOW STATUS ──────────────────────────────────────────────────────
 async function getWorkflowStatus(runId) {
-  const res = await ghFetch(
+  const res = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}`,
+    { headers: ghHeaders() },
   );
+
+  if (!res.ok) {
+    throw new Error(`GitHub status check failed (${res.status})`);
+  }
+
   const data = await res.json();
 
   if (data.status === "completed") {
@@ -144,27 +131,24 @@ async function getWorkflowStatus(runId) {
   return data.status || "in_progress"; // "queued" ou "in_progress"
 }
 
-// ─── DOWNLOAD ARTIFACT ───────────────────────────────────────────────────────
+// ─── DOWNLOAD ARTIFACT — retourne le ZIP brut ────────────────────────────────
 /**
- * Télécharge l'AAB depuis les artifacts GitHub Actions.
+ * Retourne le contenu binaire du ZIP de l'artifact.
+ * L'extraction du .aab ou .apk est faite dans index.js avec adm-zip.
  *
- * Noms d'artifacts produits par build.yml :
- *   "app-release-aab"  → le fichier .aab (release)
- *   "app-debug-apk"    → le fichier .apk (debug)
- *
- * @param {number|string} runId
- * @param {"app-release-aab"|"app-debug-apk"} artifactName
- * @returns {Buffer}
+ * Noms d'artifacts dans build.yml :
+ *   "app-release-aab"  → ZIP contenant app-release.aab
+ *   "app-debug-apk"    → ZIP contenant app-debug.apk
  */
 async function downloadArtifact(runId, artifactName) {
-  const artRes = await ghFetch(
+  const listRes = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}/artifacts`,
+    { headers: ghHeaders() },
   );
-  const artData = await artRes.json();
-  const artifacts = artData.artifacts || [];
+  const listData = await listRes.json();
+  const artifacts = listData.artifacts || [];
 
   const artifact = artifacts.find((a) => a.name === artifactName);
-
   if (!artifact) {
     const available = artifacts.map((a) => `"${a.name}"`).join(", ") || "aucun";
     throw new Error(
@@ -173,7 +157,6 @@ async function downloadArtifact(runId, artifactName) {
     );
   }
 
-  // L'URL de téléchargement redirige — on suit les redirections
   const dlRes = await fetch(artifact.archive_download_url, {
     headers: ghHeaders(),
     redirect: "follow",
@@ -183,21 +166,29 @@ async function downloadArtifact(runId, artifactName) {
     throw new Error(`Téléchargement artifact échoué (${dlRes.status})`);
   }
 
-  const buffer = await dlRes.buffer();
-  return buffer;
+  return dlRes.buffer();
 }
 
-// ─── PUBLISH PRIVACY POLICY → VERCEL ────────────────────────────────────────
+// ─── PUBLISH PRIVACY POLICY → GitHub (Vercel) ────────────────────────────────
 /**
- * Écrit le HTML à la racine du repo GitHub.
- * Vercel (connecté au repo) le déploie automatiquement.
- * Retourne l'URL Vercel publique.
+ * Écrit le HTML dans policies/<filename> dans le repo GitHub.
+ * Vercel déploie automatiquement les nouveaux fichiers.
+ * URL publique retournée : VERCEL_PROJECT_URL/<filename>
+ *
+ * Ex: policies/com-appfactory-wealthflow-privacy.html dans le repo
+ * → https://test-automation-rskn.vercel.app/com-appfactory-wealthflow-privacy.html
+ *
+ * Note Vercel : si le fichier est dans /policies/ dans le repo, Vercel le sert à /policies/<file>
+ * → adapter VERCEL_PROJECT_URL en conséquence, ou utiliser rewrites Vercel.
+ * Par défaut ici on met le fichier à la RACINE du dossier policies/ du repo.
  */
 async function publishPrivacyPolicy(appName, packageId, html) {
   const fileName = `${packageId.replace(/\./g, "-")}-privacy.html`;
-  const repoPath = fileName; // racine du repo = accessible via Vercel à /<filename>
 
-  // Vérifier si le fichier existe déjà (pour le SHA)
+  // CORRECTION : repoPath utilise le sous-dossier policies/
+  const repoPath = `policies/${fileName}`;
+
+  // SHA pour mise à jour éventuelle
   let sha;
   try {
     const checkRes = await fetch(
@@ -209,20 +200,22 @@ async function publishPrivacyPolicy(appName, packageId, html) {
       sha = existing.sha;
     }
   } catch {
-    /* fichier inexistant = OK */
+    /* fichier inexistant = première création */
   }
-
-  const body = {
-    message: sha
-      ? `Update privacy policy — ${appName} (${packageId})`
-      : `Add privacy policy — ${appName} (${packageId})`,
-    content: Buffer.from(html, "utf8").toString("base64"),
-    ...(sha ? { sha } : {}),
-  };
 
   const putRes = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${repoPath}`,
-    { method: "PUT", headers: ghHeaders(), body: JSON.stringify(body) },
+    {
+      method: "PUT",
+      headers: ghHeaders(),
+      body: JSON.stringify({
+        message: sha
+          ? `Update privacy policy — ${appName}`
+          : `Add privacy policy — ${appName}`,
+        content: Buffer.from(html, "utf8").toString("base64"),
+        ...(sha ? { sha } : {}),
+      }),
+    },
   );
 
   if (!putRes.ok) {
@@ -237,12 +230,17 @@ async function publishPrivacyPolicy(appName, packageId, html) {
     );
   }
 
-  return `${VERCEL_PROJECT_URL}/${fileName}`;
+  // Vercel sert les fichiers du repo à leur chemin relatif
+  // Si le fichier est dans policies/ dans le repo → URL = /policies/<filename>
+  return `${VERCEL_PROJECT_URL}/policies/${fileName}`;
 }
 
-// ─── UPLOAD TO PLAY CONSOLE ──────────────────────────────────────────────────
+// ─── UPLOAD TO PLAY CONSOLE ───────────────────────────────────────────────────
 /**
- * Upload AAB + listing sur Play Console en brouillon (track internal, status draft).
+ * Upload AAB (Buffer déjà extrait du ZIP) sur Play Console en brouillon.
+ *
+ * Correction critique : versionCodes doit être un tableau d'entiers [1]
+ * et non de strings ["1"] — l'API Play rejette silencieusement les strings.
  */
 async function uploadToPlayConsole({
   packageId,
@@ -252,16 +250,13 @@ async function uploadToPlayConsole({
 }) {
   const { google } = require("googleapis");
 
-  const rawServiceAccount = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT;
-  if (!rawServiceAccount) {
-    throw new Error(
-      "Variable GOOGLE_PLAY_SERVICE_ACCOUNT manquante dans Railway.",
-    );
-  }
+  const rawSA = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT;
+  if (!rawSA)
+    throw new Error("GOOGLE_PLAY_SERVICE_ACCOUNT manquant dans Railway.");
 
   let serviceAccount;
   try {
-    serviceAccount = JSON.parse(rawServiceAccount);
+    serviceAccount = JSON.parse(rawSA);
   } catch (e) {
     throw new Error(`GOOGLE_PLAY_SERVICE_ACCOUNT JSON invalide : ${e.message}`);
   }
@@ -271,16 +266,16 @@ async function uploadToPlayConsole({
     scopes: ["https://www.googleapis.com/auth/androidpublisher"],
   });
 
-  const publisher = google.androidpublisher({ version: "v3", auth });
+  const pub = google.androidpublisher({ version: "v3", auth });
 
-  // 1. Créer un edit
-  const editRes = await publisher.edits.insert({ packageName: packageId });
+  // 1. Créer l'edit
+  const editRes = await pub.edits.insert({ packageName: packageId });
   const editId = editRes.data.id;
   if (!editId) throw new Error("Play Console : impossible de créer un edit.");
 
   // 2. Upload AAB
   const { Readable } = require("stream");
-  await publisher.edits.bundles.upload({
+  await pub.edits.bundles.upload({
     packageName: packageId,
     editId,
     media: {
@@ -291,7 +286,7 @@ async function uploadToPlayConsole({
 
   // 3. Listing fr-FR
   if (listing?.title) {
-    await publisher.edits.listings.update({
+    await pub.edits.listings.update({
       packageName: packageId,
       editId,
       language: "fr-FR",
@@ -305,7 +300,7 @@ async function uploadToPlayConsole({
 
   // 4. Listing en-US
   if (listing?.title) {
-    await publisher.edits.listings.update({
+    await pub.edits.listings.update({
       packageName: packageId,
       editId,
       language: "en-US",
@@ -317,8 +312,9 @@ async function uploadToPlayConsole({
     });
   }
 
-  // 5. Track internal — draft
-  await publisher.edits.tracks.update({
+  // 5. Track internal draft
+  // CORRECTION : versionCodes = [1] (entiers) pas ["1"] (strings)
+  await pub.edits.tracks.update({
     packageName: packageId,
     editId,
     track: "internal",
@@ -326,21 +322,20 @@ async function uploadToPlayConsole({
       releases: [
         {
           status: "draft",
-          versionCodes: ["1"],
+          versionCodes: [1], // ← entier, pas string
         },
       ],
     },
   });
 
-  // 6. Commit l'edit → rend le brouillon visible dans Play Console
-  const commitRes = await publisher.edits.commit({
+  // 6. Commit → rend le brouillon visible dans Play Console
+  const commitRes = await pub.edits.commit({
     packageName: packageId,
     editId,
     changesNotSentForReview: false,
   });
 
-  const appId = commitRes.data.id || packageId;
-  return { appId, apkDownloadUrl: null };
+  return { appId: commitRes.data.id || packageId, apkDownloadUrl: null };
 }
 
 module.exports = {
