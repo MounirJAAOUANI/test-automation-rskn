@@ -159,18 +159,6 @@
       </thead>
       <tbody>
         
-        <tr>
-          <td>Identifiant publicitaire (GAID/IDFA)</td>
-          <td>Affichage de publicités personnalisées</td>
-          <td>Consentement (Art. 6.1.a RGPD)</td>
-          <td>13 mois max</td>
-        </tr>
-        <tr>
-          <td>Interactions publicitaires</td>
-          <td>Mesure de performance des campagnes</td>
-          <td>Consentement (Art. 6.1.a RGPD)</td>
-          <td>13 mois max</td>
-        </tr>
         
         <tr>
           <td>Identifiant d'installation Firebase</td>
@@ -179,6 +167,12 @@
           <td>Durée d'utilisation de l'app</td>
         </tr>
         
+        <tr>
+          <td>Token de notification push</td>
+          <td>Envoi de notifications</td>
+          <td>Consentement (Art. 6.1.a RGPD)</td>
+          <td>Jusqu'à révocation</td>
+        </tr>
         <tr>
           <td>Données d'utilisation (crashs, performances)</td>
           <td>Amélioration de l'Application</td>
@@ -205,46 +199,9 @@
     </ul>
 
     
-    <h2>3. Publicités — Google AdMob</h2>
-    <p>
-      L'Application utilise <strong>Google AdMob</strong> pour afficher des publicités.
-      AdMob peut collecter et traiter des données conformément à sa propre politique de confidentialité.
-    </p>
-    <div class="sdk-grid">
-      <div class="sdk-card">
-        <div class="sdk-name">📱 Bannière publicitaire</div>
-        <p>Publicité statique affichée en bas ou haut d'écran. Identifiant lu depuis Firebase Remote Config.</p>
-      </div>
-      <div class="sdk-card">
-        <div class="sdk-name">⬛ Interstitiel</div>
-        <p>Publicité plein écran affichée entre les transitions. Fréquence configurable à distance.</p>
-      </div>
-      <div class="sdk-card">
-        <div class="sdk-name">🎁 Rewarded (vidéo)</div>
-        <p>Publicité optionnelle en échange d'une récompense dans l'app.</p>
-      </div>
-    </div>
-    <div class="warn-box">
-      <strong>⚠️ IDs publicitaires :</strong> Les unités publicitaires sont configurées via
-      Firebase Remote Config et peuvent être mises à jour sans réinstallation de l'app.
-      Cela nous permet de changer les IDs AdMob à tout moment sans nouvelle version.
-    </div>
-    <p>
-      Politique de confidentialité Google AdMob :{" "}
-      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">
-        policies.google.com/privacy
-      </a>
-    </p>
-    <p>
-      Pour désactiver la personnalisation des publicités :{" "}
-      <a href="https://adssettings.google.com" target="_blank" rel="noopener">
-        adssettings.google.com
-      </a>
-    </p>
-    
 
     
-    <h2>4. Firebase Remote Config</h2>
+    <h2>3. Firebase Remote Config</h2>
     <p>
       L'Application utilise <strong>Firebase Remote Config</strong> de Google pour récupérer des
       paramètres de configuration (identifiants AdMob, prix des achats intégrés, activation/désactivation
@@ -262,6 +219,24 @@
     </p>
     
 
+    
+    <h2>4. Achats intégrés (In-App Purchase)</h2>
+    <p>
+      L'Application propose des achats intégrés via le <strong>Google Play Store</strong>.
+      Toutes les transactions sont traitées exclusivement par Google — nous n'avons jamais accès
+      à vos données bancaires ou de paiement.
+    </p>
+    <ul>
+      <li>Les achats sont non-remboursables sauf si la politique Google Play l'exige.</li>
+      <li>Les achats Premium sont associés à votre compte Google Play et restaurables.</li>
+      <li>Prix configurables à distance via Firebase Remote Config sans mise à jour de l'app.</li>
+    </ul>
+    <p>
+      Politique de remboursement Google Play :{" "}
+      <a href="https://support.google.com/googleplay/answer/2479637" target="_blank" rel="noopener">
+        support.google.com/googleplay
+      </a>
+    </p>
     
 
     <h2>6. Transfert international de données</h2>
