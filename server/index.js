@@ -435,13 +435,13 @@ app.post("/api/agents/build-deploy", async (req, res) => {
       );
       log("Build en cours (3-8 minutes selon GitHub)...");
 
-      // ÉTAPE 2 — Polling (max 15 min)
+      // ÉTAPE 2 — Polling (max 45 min)
       let attempts = 0;
       let status = "queued";
 
       while (
         (status === "queued" || status === "in_progress") &&
-        attempts < 90
+        attempts < 270
       ) {
         await delay(10000);
         attempts++;

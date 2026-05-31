@@ -109,7 +109,7 @@ export async function runAgent(agentId, payload, onLog, onDone, onError) {
  */
 export async function runBuildAgent(payload, onLog, onDone, onError) {
   const POLL_INTERVAL = 3000; // 3s entre chaque poll
-  const MAX_POLLS = 900; // 300 × 3s = 15 min max côté client
+  const MAX_POLLS = 2700; // 900 × 3s = 45 min max côté client
 
   // 1. Lancer le job (réponse en ~1s)
   let jobId;
