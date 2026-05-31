@@ -15,6 +15,7 @@ const REQUIRED_MODULES = [
   "googleapis",
   "google-play-scraper",
   "node-fetch",
+  "puppeteer",
   "sharp",
 ];
 for (const mod of REQUIRED_MODULES) {
