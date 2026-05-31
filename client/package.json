@@ -10,7 +10,7 @@
     "start":   "serve dist -p ${PORT:-8080} -s"
   },
   "engines": {
-    "node": ">=24.11.1"
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "react":     "^18.3.1",

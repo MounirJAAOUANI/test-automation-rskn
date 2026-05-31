@@ -435,13 +435,13 @@ app.post("/api/agents/build-deploy", async (req, res) => {
       );
       log("Build en cours (3-8 minutes selon GitHub)...");
 
-      // ÉTAPE 2 — Polling (max 45 min)
+      // ÉTAPE 2 — Polling (max 15 min)
       let attempts = 0;
       let status = "queued";
 
       while (
         (status === "queued" || status === "in_progress") &&
-        attempts < 270
+        attempts < 90
       ) {
         await delay(10000);
         attempts++;
@@ -500,7 +500,6 @@ app.post("/api/agents/build-deploy", async (req, res) => {
       // ÉTAPE 4 — APK debug (non bloquant)
       let apkUrl = `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`;
       let apkSizeMB = "~45";
-      log("Téléchargement artifact APK (ZIP)...");
       try {
         const apkZipBuf = await githubLib.downloadArtifact(
           workflowRun.id,
