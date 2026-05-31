@@ -160,7 +160,19 @@
       <tbody>
         
         
+        <tr>
+          <td>Identifiant d'installation Firebase</td>
+          <td>Configuration distante (Remote Config)</td>
+          <td>Intérêt légitime (Art. 6.1.f RGPD)</td>
+          <td>Durée d'utilisation de l'app</td>
+        </tr>
         
+        <tr>
+          <td>Token de notification push</td>
+          <td>Envoi de notifications</td>
+          <td>Consentement (Art. 6.1.a RGPD)</td>
+          <td>Jusqu'à révocation</td>
+        </tr>
         <tr>
           <td>Données d'utilisation (crashs, performances)</td>
           <td>Amélioration de l'Application</td>
@@ -188,6 +200,23 @@
 
     
 
+    
+    <h2>3. Firebase Remote Config</h2>
+    <p>
+      L'Application utilise <strong>Firebase Remote Config</strong> de Google pour récupérer des
+      paramètres de configuration (identifiants AdMob, prix des achats intégrés, activation/désactivation
+      des publicités) sans nécessiter de mise à jour de l'application.
+    </p>
+    <div class="info-box">
+      <strong>Données transmises à Firebase :</strong> Uniquement un identifiant d'installation anonyme
+      pour identifier la version de configuration applicable. Aucune donnée personnelle identifiable n'est transmise.
+    </div>
+    <p>
+      Politique de confidentialité Firebase :{" "}
+      <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">
+        firebase.google.com/support/privacy
+      </a>
+    </p>
     
 
     
