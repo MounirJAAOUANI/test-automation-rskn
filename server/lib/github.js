@@ -1,18 +1,10 @@
 "use strict";
 /**
- * server/lib/github.js — VERSION FINALE
+ * server/lib/github.js
  *
- * publishPrivacyPolicy :
- *   - repoPath = policies/${fileName}   ← fichier dans /policies/ dans le repo
- *   - URL Vercel retournée = VERCEL_PROJECT_URL/${fileName}  (sans /policies/)
- *     Vercel rewrite doit mapper /<file> → /policies/<file>
- *     OU configurer vercel.json (voir README)
- *
- * uploadToPlayConsole :
- *   - versionCodes = [1] (entiers) pas ["1"] (strings)
- *
- * downloadArtifact :
- *   - Retourne le Buffer ZIP brut (extraction dans index.js avec adm-zip)
+ * FIX : require("googleapis") déplacé dans uploadToPlayConsole()
+ *       pour éviter les erreurs de module absent au démarrage.
+ *       Utilise un try/catch pour message clair si absent.
  */
 
 const fetch = require("node-fetch");
@@ -37,7 +29,6 @@ function ghHeaders() {
 
 // ─── TRIGGER BUILD ────────────────────────────────────────────────────────────
 async function triggerBuild({ appName, packageId, primaryColor }) {
-  // Snapshot des runs existants avant dispatch
   const beforeRes = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs?per_page=10&branch=main`,
     { headers: ghHeaders() },
@@ -47,7 +38,6 @@ async function triggerBuild({ appName, packageId, primaryColor }) {
     (beforeData.workflow_runs || []).map((r) => r.id),
   );
 
-  // Dispatch
   const cleanColor = (primaryColor || "7C3AED").replace(/#/g, "");
   const trigRes = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/build.yml/dispatches`,
@@ -69,11 +59,10 @@ async function triggerBuild({ appName, packageId, primaryColor }) {
     const errText = await trigRes.text();
     throw new Error(
       `GitHub Actions dispatch failed (${trigRes.status}): ${errText}\n` +
-        `Vérifiez que GITHUB_TOKEN a le scope "workflow" et que build.yml existe.`,
+        `Vérifiez que GITHUB_TOKEN a le scope "workflow".`,
     );
   }
 
-  // Poll jusqu'à voir le nouveau run (max 36s)
   let newRun = null;
   for (let i = 0; i < 12; i++) {
     await new Promise((r) => setTimeout(r, 3000));
@@ -115,7 +104,7 @@ async function getWorkflowStatus(runId) {
   return data.status || "in_progress";
 }
 
-// ─── DOWNLOAD ARTIFACT — retourne ZIP brut ───────────────────────────────────
+// ─── DOWNLOAD ARTIFACT ─────────────────────────────────────────────────────────
 async function downloadArtifact(runId, artifactName) {
   const listRes = await fetch(
     `${GH_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}/artifacts`,
@@ -142,21 +131,10 @@ async function downloadArtifact(runId, artifactName) {
   return dlRes.buffer();
 }
 
-// ─── PUBLISH PRIVACY POLICY ───────────────────────────────────────────────────
-/**
- * Écrit dans policies/${fileName} dans le repo GitHub.
- * Vercel déploie → URL publique = VERCEL_PROJECT_URL/${fileName} (sans /policies/).
- *
- * Pour que Vercel serve /policies/<file> à /<file>, ajoute vercel.json à la racine du repo :
- * {
- *   "rewrites": [
- *     { "source": "/:file(.*-privacy.html)", "destination": "/policies/:file" }
- *   ]
- * }
- */
+// ─── PUBLISH PRIVACY POLICY ────────────────────────────────────────────────────
 async function publishPrivacyPolicy(appName, packageId, html) {
   const fileName = `${packageId.replace(/\./g, "-")}-privacy.html`;
-  const repoPath = `policies/${fileName}`; // ← dans /policies/ dans le repo
+  const repoPath = `policies/${fileName}`;
 
   let sha;
   try {
@@ -192,18 +170,31 @@ async function publishPrivacyPolicy(appName, packageId, html) {
     throw new Error("Variable VERCEL_PROJECT_URL manquante dans Railway.");
   }
 
-  // URL sans /policies/ — Vercel rewrite gère la redirection
   return `${VERCEL_PROJECT_URL}/${fileName}`;
 }
 
-// ─── UPLOAD TO PLAY CONSOLE ───────────────────────────────────────────────────
+// ─── UPLOAD TO PLAY CONSOLE ────────────────────────────────────────────────────
+/**
+ * FIX : require("googleapis") déplacé ici (pas à la racine du fichier)
+ *       → évite "Cannot find module" au démarrage si googleapis manque
+ *       → essaie de charger, affiche un message clair sinon
+ */
 async function uploadToPlayConsole({
   packageId,
   aabBuffer,
   listing,
   policyUrl,
 }) {
-  const { google } = require("googleapis");
+  // Charger googleapis de façon sécurisée
+  let google;
+  try {
+    google = require("googleapis");
+  } catch (err) {
+    throw new Error(
+      `Impossible de charger googleapis — est-ce que "npm install" a été exécuté dans /server ? ` +
+        `(${err.message})`,
+    );
+  }
 
   const rawSA = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT;
   if (!rawSA)
@@ -227,7 +218,7 @@ async function uploadToPlayConsole({
   const editId = editRes.data.id;
   if (!editId) throw new Error("Play Console : impossible de créer un edit.");
 
-  // 2. Upload AAB (Buffer extrait du ZIP)
+  // 2. Upload AAB
   const { Readable } = require("stream");
   await pub.edits.bundles.upload({
     packageName: packageId,
@@ -267,7 +258,6 @@ async function uploadToPlayConsole({
   }
 
   // 5. Track internal draft
-  // versionCodes = entiers [1] pas strings ["1"]
   await pub.edits.tracks.update({
     packageName: packageId,
     editId,

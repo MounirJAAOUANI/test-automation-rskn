@@ -195,7 +195,7 @@ export async function runBuildAgent(payload, onLog, onDone, onError) {
   }
 
   // Timeout client (ne devrait pas arriver)
-  onError({ msg: "Timeout client après 15 minutes — vérifiez GitHub Actions" });
+  onError({ msg: "Timeout client après 45 minutes — vérifiez GitHub Actions" });
 }
 
 // ─── HEALTH CHECK ────────────────────────────────────────────────────────────
