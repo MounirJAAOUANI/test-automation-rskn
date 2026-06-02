@@ -1,25 +1,12 @@
 "use strict";
-/**
- * server/lib/jobQueue.js
- *
- * File d'attente en mémoire pour les tâches longues.
- * FIX : cleanup interval maintenant à 8h (au lieu de 2h)
- *       pour éviter que les jobs disparaissent pendant le polling.
- *
- * Architecture :
- *  1. POST /api/agents/build-deploy → crée job en background → répond {jobId}
- *  2. GET /api/jobs/:jobId → poll avec cursor
- */
-
 const { randomUUID } = require("crypto");
 
 const jobs = new Map();
 
-// Nettoyer les vieux jobs toutes les 4h (garde 8h)
-// → permet au polling de durer jusqu'à 15 min sans que le job disparaisse
+// Cleanup toutes les 4h (garde 8h)
 setInterval(
   () => {
-    const cutoff = Date.now() - 8 * 60 * 60 * 1000; // 8 heures
+    const cutoff = Date.now() - 8 * 60 * 60 * 1000;
     let deleted = 0;
     for (const [id, job] of jobs.entries()) {
       if (job.createdAt < cutoff) {
@@ -27,15 +14,13 @@ setInterval(
         deleted++;
       }
     }
-    if (deleted > 0)
-      console.log(`🧹 Nettoyage jobQueue : ${deleted} jobs supprimés`);
+    if (deleted > 0) console.log(`🧹 Nettoyage : ${deleted} jobs supprimés`);
   },
   4 * 60 * 60 * 1000,
 );
 
 /**
  * Crée un nouveau job.
- * @returns {{ jobId: string, log: fn, done: fn, fail: fn }}
  */
 function createJob() {
   const jobId = randomUUID();
@@ -56,28 +41,31 @@ function createJob() {
       second: "2-digit",
     });
 
+  console.log(`[createJob] Nouveau job créé: ${jobId}`);
+
   return {
     jobId,
     log(msg, type = "info") {
+      if (job.status !== "running") return; // Ignore si déjà terminé
       job.logs.push({ ts: ts(), msg, type });
+      console.log(`[${jobId}] ${msg}`);
     },
     done(data) {
       job.status = "done";
       job.result = data;
+      console.log(`[${jobId}] Job terminé avec succès`);
     },
     fail(err) {
       job.status = "error";
       job.error = err?.message || String(err);
       job.logs.push({ ts: ts(), msg: `❌ ${job.error}`, type: "error" });
+      console.log(`[${jobId}] Job échoué: ${job.error}`);
     },
   };
 }
 
 /**
  * Retourne l'état d'un job.
- * @param {string} jobId
- * @param {number} cursor — index du dernier log lu
- * @returns {{ found, status, newLogs, cursor, result, error }}
  */
 function getJobStatus(jobId, cursor = 0) {
   const job = jobs.get(jobId);
@@ -94,4 +82,11 @@ function getJobStatus(jobId, cursor = 0) {
   };
 }
 
-module.exports = { createJob, getJobStatus };
+/**
+ * Retourne tous les jobs (pour debug).
+ */
+function getAllJobs() {
+  return Array.from(jobs.values());
+}
+
+module.exports = { createJob, getJobStatus, getAllJobs };

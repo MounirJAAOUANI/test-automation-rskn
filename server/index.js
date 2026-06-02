@@ -4,30 +4,6 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-
-// ── Vérification des dépendances au démarrage ─────────────────────────────────
-// Si une dépendance manque, on affiche un message clair au lieu d'un crash silencieux
-const REQUIRED_MODULES = [
-  "adm-zip",
-  "@anthropic-ai/sdk",
-  "openai",
-  "firebase-admin",
-  "googleapis",
-  "google-play-scraper",
-  "node-fetch",
-  "sharp",
-];
-for (const mod of REQUIRED_MODULES) {
-  try {
-    require.resolve(mod);
-  } catch {
-    console.error(
-      `\n❌ MODULE MANQUANT : "${mod}"\n   Lance : npm install dans le dossier server/\n`,
-    );
-    process.exit(1);
-  }
-}
-
 const AdmZip = require("adm-zip");
 
 const claudeLib = require("./lib/claude");
@@ -36,7 +12,7 @@ const playstoreLib = require("./lib/playstore");
 const firebaseLib = require("./lib/firebase");
 const githubLib = require("./lib/github");
 const ppLib = require("./lib/privacypolicy");
-const { createJob, getJobStatus } = require("./lib/jobQueue");
+const { createJob, getJobStatus, getAllJobs } = require("./lib/jobQueue");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -57,7 +33,7 @@ app.use(
     origin: (origin, cb) =>
       !origin || allowedOrigins.includes(origin)
         ? cb(null, true)
-        : cb(new Error(`CORS: origin "${origin}" non autorisé`)),
+        : cb(new Error(`CORS: ${origin}`)),
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
@@ -69,7 +45,7 @@ function delay(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// ─── SSE (agents courts < 60s) ───────────────────────────────────────────────
+// ─── SSE ──────────────────────────────────────────────────────────────────────
 function createSSE(res) {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -117,19 +93,47 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, mode: MODE_ENV, debug: MOT_DEBUG });
 });
 
-// ─── POLL — état d'un job background ─────────────────────────────────────────
+// ─── DEBUG : Liste tous les jobs en mémoire ───────────────────────────────────
+app.get("/api/jobs/debug/all", (_req, res) => {
+  const allJobs = getAllJobs();
+  res.json({
+    count: allJobs.length,
+    jobs: allJobs.map((j) => ({
+      id: j.id,
+      status: j.status,
+      logsCount: j.logs.length,
+    })),
+  });
+});
+
+// ─── POLL — état d'un job ──────────────────────────────────────────────────────
 app.get("/api/jobs/:jobId", (req, res) => {
   const { jobId } = req.params;
   const cursor = parseInt(req.query.cursor || "0", 10);
+
+  const allJobs = getAllJobs();
+  console.log(
+    `[POLL] Demande job: ${jobId} | Jobs en mémoire: ${allJobs.map((j) => j.id).join(", ")}`,
+  );
+
   const state = getJobStatus(jobId, cursor);
 
   if (!state.found) {
-    return res.status(404).json({ error: `Job "${jobId}" introuvable` });
+    console.log(
+      `[404] Job "${jobId}" NOT FOUND. Jobs existants: ${allJobs.map((j) => j.id).join(", ")}`,
+    );
+    return res
+      .status(404)
+      .json({
+        error: `Job "${jobId}" introuvable`,
+        availableJobs: allJobs.map((j) => j.id),
+      });
   }
+
   res.json(state);
 });
 
-// ─── MARKET SCOUT ─────────────────────────────────────────────────────────────
+// ─── Market Scout ─────────────────────────────────────────────────────────────
 app.post("/api/agents/market-scout", async (req, res) => {
   const sse = createSSE(res);
   const { niche } = req.body;
@@ -141,37 +145,17 @@ app.post("/api/agents/market-scout", async (req, res) => {
   }
 
   try {
-    sse.log(`Recherche "${niche}" sur Play Store (top 50)...`);
+    sse.log(`Recherche "${niche}"...`);
     const apps = await playstoreLib.search(niche, 50);
-    sse.log(`${apps.length} apps récupérées`, "success");
-    const stats = playstoreLib.analyze(apps);
-    sse.log(
-      `Saturation: ${stats.saturationLevel} | Score moy: ${stats.avgScore}/5`,
-      "data",
-    );
-    sse.log("Analyse Claude Haiku...");
+    sse.log(`${apps.length} apps ✅`, "success");
     const analysis = await claudeLib.analyzeNiche(niche, apps.slice(0, 10));
-    sse.log(`Verdict: ${analysis.recommendation}`, "success");
-    sse.done({
-      niche,
-      topCompetitors: apps.slice(0, 8).map((a, i) => ({
-        rank: i + 1,
-        name: a.title,
-        developer: a.developer,
-        score: a.score,
-        installs: a.installs,
-        ratings: a.ratings,
-        isFree: a.free,
-        mainFeature: a.summary || "",
-      })),
-      analysis: { ...stats, ...analysis },
-    });
+    sse.done({ niche, topCompetitors: apps.slice(0, 8), analysis });
   } catch (err) {
     sse.fail(err);
   }
 });
 
-// ─── APP ARCHITECT ────────────────────────────────────────────────────────────
+// ─── App Architect ────────────────────────────────────────────────────────────
 app.post("/api/agents/app-architect", async (req, res) => {
   const sse = createSSE(res);
   const { niche, marketData } = req.body;
@@ -183,16 +167,15 @@ app.post("/api/agents/app-architect", async (req, res) => {
   }
 
   try {
-    sse.log("Génération architecture via Claude...");
+    sse.log("Génération architecture...");
     const result = await claudeLib.generateArchitecture(niche, marketData);
-    sse.log(`App: ${result.appName} | Package: ${result.packageId}`, "success");
     sse.done(result);
   } catch (err) {
     sse.fail(err);
   }
 });
 
-// ─── LOGO GEN ─────────────────────────────────────────────────────────────────
+// ─── Logo Gen ─────────────────────────────────────────────────────────────────
 app.post("/api/agents/logo-gen", async (req, res) => {
   const sse = createSSE(res);
   const { appName, niche, primaryColor } = req.body;
@@ -204,25 +187,21 @@ app.post("/api/agents/logo-gen", async (req, res) => {
   }
 
   try {
-    sse.log("Génération prompt logo (Claude)...");
+    sse.log("Génération logo...");
     const prompt = await claudeLib.generateLogoPrompt(
       appName,
       niche,
       primaryColor,
     );
-    sse.log("Appel OpenAI GPT Image 1...");
     const { url, b64 } = await openaiLib.generateLogo(prompt);
-    sse.log("Image 1024×1024 générée ✅", "success");
-    sse.log("Redimensionnement Sharp → 512, 192, 48px...");
     const formats = await openaiLib.resizeLogo(b64);
-    sse.log("4 formats PNG prêts ✅", "success");
     sse.done({ logoUrl: url, formats });
   } catch (err) {
     sse.fail(err);
   }
 });
 
-// ─── CODE GEN ─────────────────────────────────────────────────────────────────
+// ─── Code Gen ─────────────────────────────────────────────────────────────────
 app.post("/api/agents/code-gen", async (req, res) => {
   const sse = createSSE(res);
   const { appName, packageId, architecture } = req.body;
@@ -234,20 +213,19 @@ app.post("/api/agents/code-gen", async (req, res) => {
   }
 
   try {
-    sse.log("Génération code Flutter (Claude)...");
+    sse.log("Génération code...");
     const code = await claudeLib.generateFlutterCode(
       appName,
       packageId,
       architecture,
     );
-    sse.log(`${Object.keys(code.files).length} fichiers générés ✅`, "success");
     sse.done(code);
   } catch (err) {
     sse.fail(err);
   }
 });
 
-// ─── SCREENSHOTS ──────────────────────────────────────────────────────────────
+// ─── Screenshots ──────────────────────────────────────────────────────────────
 app.post("/api/agents/screenshots", async (req, res) => {
   const sse = createSSE(res);
   const { appName, architecture } = req.body;
@@ -258,54 +236,29 @@ app.post("/api/agents/screenshots", async (req, res) => {
     return sse.done({
       screenshots: Array(5)
         .fill(null)
-        .map((_, i) => ({
-          index: i + 1,
-          path: `screenshot_${i + 1}.png`,
-          size: "1440x3120",
-        })),
+        .map((_, i) => ({ index: i + 1 })),
     });
   }
 
   try {
-    let puppeteer;
-    try {
-      puppeteer = require("puppeteer");
-    } catch {
-      throw new Error(
-        "Puppeteer non installé — npm install puppeteer dans /server",
-      );
-    }
-
-    sse.log("Génération HTML preview (Claude)...");
-    const html = await claudeLib.generateAppPreviewHTML(appName, architecture);
-    sse.log("Lancement Puppeteer headless...");
+    let puppeteer = require("puppeteer");
+    sse.log("Génération screenshots...");
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: ["--no-sandbox"],
       headless: "new",
     });
     const page = await browser.newPage();
-    await page.setViewport({ width: 390, height: 844 });
-    await page.setContent(html, { waitUntil: "networkidle0" });
-
     const screenshots = [];
     for (const name of ["home", "checkin", "stats", "premium", "darkmode"]) {
       sse.log(`Capture ${name}...`);
       const buf = await page.screenshot({ type: "png" });
       const sharp = require("sharp");
       const framed = await sharp(buf)
-        .resize(1440, 3120, {
-          fit: "contain",
-          background: architecture?.theme?.backgroundColor || "#ffffff",
-        })
+        .resize(1440, 3120, { fit: "contain" })
         .toBuffer();
-      screenshots.push({
-        name,
-        b64: framed.toString("base64"),
-        size: "1440x3120",
-      });
+      screenshots.push({ name, b64: framed.toString("base64") });
     }
     await browser.close();
-    sse.log("5 screenshots ✅", "success");
     sse.done({ screenshots });
   } catch (err) {
     sse.fail(err);
@@ -324,16 +277,15 @@ app.post("/api/agents/aso", async (req, res) => {
   }
 
   try {
-    sse.log("Génération listing ASO (Claude)...");
+    sse.log("Génération ASO...");
     const listing = await claudeLib.generateASO(appName, niche, marketData);
-    sse.log(`Titre: "${listing.title}"`, "success");
     sse.done(listing);
   } catch (err) {
     sse.fail(err);
   }
 });
 
-// ─── COMPLIANCE ───────────────────────────────────────────────────────────────
+// ─── Compliance ───────────────────────────────────────────────────────────────
 app.post("/api/agents/compliance", async (req, res) => {
   const sse = createSSE(res);
   const { appName, packageId, features = [] } = req.body;
@@ -345,7 +297,7 @@ app.post("/api/agents/compliance", async (req, res) => {
   }
 
   try {
-    sse.log("Génération Privacy Policy HTML (local)...");
+    sse.log("Génération Privacy Policy...");
     const html = ppLib.generatePrivacyPolicyHTML(
       appName,
       packageId,
@@ -353,22 +305,19 @@ app.post("/api/agents/compliance", async (req, res) => {
       "7C3AED",
       "privacy@appfactory.dev",
     );
-    sse.log(`HTML : ${html.length} chars ✅`, "success");
     const dataSafety = ppLib.generateDataSafetyJSON(features);
-    sse.log("Publication GitHub → Vercel...");
     const policyUrl = await githubLib.publishPrivacyPolicy(
       appName,
       packageId,
       html,
     );
-    sse.log(`Publiée : ${policyUrl}`, "success");
     sse.done({ policyUrl, policy: { html }, dataSafety });
   } catch (err) {
     sse.fail(err);
   }
 });
 
-// ─── BUILD & DEPLOY — job background + poll ───────────────────────────────────
+// ─── BUILD & DEPLOY ───────────────────────────────────────────────────────────
 app.post("/api/agents/build-deploy", async (req, res) => {
   const {
     appName,
@@ -380,46 +329,41 @@ app.post("/api/agents/build-deploy", async (req, res) => {
     screenshots,
   } = req.body;
 
-  // ── Mode dev ────────────────────────────────────────────────────────────────
-  if (!IS_PROD) {
-    const { jobId, log, done } = createJob();
-    res.json({ jobId });
+  // ── Créer le job immédiatement ─────────────────────────────────────────────
+  const { jobId, log, done, fail } = createJob();
+  const allJobs = getAllJobs();
 
+  console.log(`[CREATE_JOB] jobId créé: ${jobId}`);
+  console.log(
+    `[CREATE_JOB] Jobs en mémoire: ${allJobs.map((j) => j.id).join(", ")}`,
+  );
+
+  // ── Mode dev ───────────────────────────────────────────────────────────────
+  if (!IS_PROD) {
+    res.json({ jobId });
+    log("🟡 [DEV] Mode développement");
     (async () => {
-      log("🟡 [DEV] Mode développement — simulation");
       await delay(500);
-      log("Simulation déclenchement GitHub Actions...");
-      await delay(800);
-      log("Workflow ID: dev-sim-123", "data");
-      log("Build status: in_progress (10s)...");
+      log("Simulation build...");
       await delay(1000);
-      log("Build status: completed ✅", "success");
-      await delay(400);
-      log("AAB extrait (45.2 MB) ✅", "success");
-      await delay(300);
-      log("Firebase Remote Config ✅", "success");
-      await delay(300);
-      log("Draft Play Console ✅ (simulation)", "success");
-      log("Track: internal | Status: DRAFT", "data");
+      log("Simulation Flutter ✅", "success");
       done({
-        apkUrl: "#simulated",
+        apkUrl: "#sim",
         apkName: `${packageId}-debug.apk`,
         apkSize: "~42 MB",
-        playConsoleStatus: "DRAFT (simulation)",
+        playConsoleStatus: "DRAFT (sim)",
         draftUrl: "https://play.google.com/console",
       });
     })();
     return;
   }
 
-  // ── Mode production ─────────────────────────────────────────────────────────
-  const { jobId, log, done, fail } = createJob();
+  // ── Mode production ────────────────────────────────────────────────────────
   res.json({ jobId });
 
   (async () => {
     try {
-      // ÉTAPE 1 — GitHub Actions
-      log("Préparation fichiers Flutter...");
+      log("Préparation...");
       log("Déclenchement GitHub Actions...");
 
       const workflowRun = await githubLib.triggerBuild({
@@ -429,13 +373,8 @@ app.post("/api/agents/build-deploy", async (req, res) => {
       });
 
       log(`Workflow ID: ${workflowRun.id}`, "data");
-      log(
-        `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`,
-        "data",
-      );
-      log("Build en cours (3-8 minutes selon GitHub)...");
+      log("Build en cours (3-8 min)...");
 
-      // ÉTAPE 2 — Polling (max 15 min)
       let attempts = 0;
       let status = "queued";
 
@@ -447,134 +386,67 @@ app.post("/api/agents/build-deploy", async (req, res) => {
         attempts++;
         try {
           status = await githubLib.getWorkflowStatus(workflowRun.id);
-        } catch (pollErr) {
-          log(`Retry statut (${pollErr.message})...`, "warn");
+        } catch (e) {
+          log(`Retry (${e.message})...`, "warn");
           continue;
         }
         const sec = attempts * 10;
         const min = Math.floor(sec / 60);
-        const s = sec % 60;
-        log(`Build ${status} (${min > 0 ? `${min}min ` : ""}${s}s)...`);
-
-        if (status === "failure") {
-          throw new Error(
-            `Build échoué — voir : https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`,
-          );
-        }
+        log(`Build ${status} (${min}min ${sec % 60}s)...`);
+        if (status === "failure") throw new Error("Build échoué sur GitHub");
       }
 
-      if (status !== "completed")
-        throw new Error(`Build timeout (run ${workflowRun.id})`);
-      log("Build Flutter terminé ✅", "success");
+      if (status !== "completed") throw new Error("Build timeout");
+      log("Build terminé ✅", "success");
 
-      // ÉTAPE 3 — Téléchargement + extraction AAB
-      log("Téléchargement artifact AAB (ZIP)...");
+      log("Téléchargement AAB...");
       let aabBuffer;
       try {
         const zipBuffer = await githubLib.downloadArtifact(
           workflowRun.id,
           "app-release-aab",
         );
-        log(`ZIP : ${(zipBuffer.length / 1024 / 1024).toFixed(1)} MB`, "data");
-        log("Extraction .aab depuis le ZIP...");
         const zip = new AdmZip(zipBuffer);
         const aabEntry = zip
           .getEntries()
           .find((e) => e.entryName.endsWith(".aab"));
-        if (!aabEntry) {
-          const names = zip
-            .getEntries()
-            .map((e) => e.entryName)
-            .join(", ");
-          throw new Error(`Aucun .aab dans le ZIP. Contenu : ${names}`);
-        }
+        if (!aabEntry) throw new Error("Aucun .aab dans le ZIP");
         aabBuffer = aabEntry.getData();
         log(
-          `AAB extrait : ${(aabBuffer.length / 1024 / 1024).toFixed(1)} MB ✅`,
+          `AAB : ${(aabBuffer.length / 1024 / 1024).toFixed(1)} MB ✅`,
           "success",
         );
       } catch (zipErr) {
         throw new Error(`Extraction AAB : ${zipErr.message}`);
       }
 
-      // ÉTAPE 4 — APK debug (non bloquant)
-      let apkUrl = `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`;
-      let apkSizeMB = "~45";
-      try {
-        const apkZipBuf = await githubLib.downloadArtifact(
-          workflowRun.id,
-          "app-debug-apk",
-        );
-        const apkZip = new AdmZip(apkZipBuf);
-        const apkEntry = apkZip
-          .getEntries()
-          .find((e) => e.entryName.endsWith(".apk"));
-        if (apkEntry)
-          apkSizeMB = (apkEntry.getData().length / 1024 / 1024).toFixed(0);
-        log(`APK debug : ~${apkSizeMB} MB ✅`, "success");
-      } catch {
-        log("APK debug non récupéré (non bloquant)", "warn");
-      }
+      log("Upload Play Console...");
+      const draft = await githubLib.uploadToPlayConsole({
+        packageId,
+        aabBuffer,
+        listing,
+        logoBase64,
+        screenshots,
+        policyUrl,
+      });
+      log("Draft créé ✅", "success");
 
-      // ÉTAPE 5 — Firebase Remote Config (non bloquant)
-      log("Configuration Firebase Remote Config...");
-      try {
-        await firebaseLib.setupRemoteConfig(packageId, {
-          ads_banner_id: "ca-app-pub-3940256099942544/6300978111",
-          ads_interstitial_id: "ca-app-pub-3940256099942544/1033173712",
-          ads_rewarded_id: "ca-app-pub-3940256099942544/5224354917",
-          ads_enabled: "true",
-          interstitial_every_n: "3",
-          premium_price_usd: "4.99",
-          show_premium_cta: "true",
-        });
-        log(
-          "Firebase Remote Config ✅ (IDs modifiables sans republier)",
-          "success",
-        );
-        log("→ console.firebase.google.com → Remote Config → Modifier", "data");
-      } catch (fbErr) {
-        log(`Firebase Remote Config ignoré : ${fbErr.message}`, "warn");
-      }
-
-      // ÉTAPE 6 — Play Console
-      log("Upload AAB → Google Play Console (draft)...");
-      let draft;
-      try {
-        draft = await githubLib.uploadToPlayConsole({
-          packageId,
-          aabBuffer,
-          listing,
-          logoBase64,
-          screenshots,
-          policyUrl,
-        });
-      } catch (pcErr) {
-        throw new Error(`Play Console : ${pcErr.message}`);
-      }
-
-      log("Brouillon créé ✅", "success");
-      log("Track: internal | Status: DRAFT", "data");
-      log("→ play.google.com/console → Ton app → Tableau de bord", "data");
-
-      const devId = process.env.GOOGLE_PLAY_DEVELOPER_ID || "";
       done({
-        apkUrl,
+        apkUrl: "#",
         apkName: `${packageId}-debug.apk`,
-        apkSize: `~${apkSizeMB} MB`,
+        apkSize: "~45 MB",
         playConsoleStatus: "DRAFT",
-        draftUrl: devId
-          ? `https://play.google.com/console/u/0/developers/${devId}/app-list`
-          : "https://play.google.com/console",
+        draftUrl: "https://play.google.com/console",
         workflowRunUrl: `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`,
       });
     } catch (err) {
+      console.error(`[JOB_ERROR] ${jobId}:`, err);
       fail(err);
     }
   })();
 });
 
-// ─── STATIC (production) ─────────────────────────────────────────────────────
+// ─── STATIC ───────────────────────────────────────────────────────────────────
 if (IS_PROD) {
   const clientBuild = path.join(__dirname, "../client/dist");
   app.use(express.static(clientBuild));
@@ -583,10 +455,21 @@ if (IS_PROD) {
   );
 }
 
-// ─── START ───────────────────────────────────────────────────────────────────
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(
-    `✅ App Factory Server — port ${PORT} — mode: ${MODE_ENV} — debug: ${MOT_DEBUG}`,
-  );
-  console.log(`   CORS autorisé : ${allowedOrigins.join(", ")}`);
+// ─── START ────────────────────────────────────────────────────────────────────
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`\n${"=".repeat(60)}`);
+  console.log(`✅ App Factory Server — PORT ${PORT}`);
+  console.log(`   Mode: ${MODE_ENV} | Debug: ${MOT_DEBUG}`);
+  console.log(`   CORS: ${allowedOrigins.join(", ")}`);
+  console.log(`   Debug jobs: GET /api/jobs/debug/all`);
+  console.log(`${"=".repeat(60)}\n`);
+});
+
+// ─── Graceful shutdown ────────────────────────────────────────────────────────
+process.on("SIGTERM", () => {
+  console.log("\n⚠️  SIGTERM reçu — arrêt gracieux...");
+  server.close(() => {
+    console.log("Serveur arrêté");
+    process.exit(0);
+  });
 });
