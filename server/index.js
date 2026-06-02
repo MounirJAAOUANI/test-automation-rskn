@@ -582,7 +582,23 @@ if (IS_PROD) {
     res.sendFile(path.join(clientBuild, "index.html")),
   );
 }
+// ----- LOGS -----
+process.on("SIGTERM", () => {
+  console.log("SIGTERM reçu");
+});
 
+process.on("SIGINT", () => {
+  console.log("SIGINT reçu");
+});
+
+process.on("uncaughtException", (err) => {
+  console.error(err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error(err);
+});
+// ------ LOGS -----
 // ─── START ───────────────────────────────────────────────────────────────────
 app.listen(PORT, "0.0.0.0", () => {
   console.log(
