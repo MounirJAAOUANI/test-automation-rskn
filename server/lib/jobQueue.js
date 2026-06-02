@@ -1,66 +1,83 @@
 "use strict";
 /**
- * server/lib/jobQueue.js — avec persistance SQLite
+ * server/lib/jobQueue.js — Persistance JSON simple
  *
- * Les jobs survivent aux redémarrages Railway.
- * Chaque job est sauvegardé immédiatement dans la DB.
- *
- * Aucune dépendance externe — utilise sqlite3 du système.
+ * - Zéro dépendance externe
+ * - Sauvegarde dans jobs.json
+ * - Survit aux redémarrages Railway
+ * - Logs détaillés partout
  */
 
 const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
 
-// ─── Initialiser la DB ─────────────────────────────────────────────────────
-const dbPath = path.join(process.cwd(), "jobs.sqlite");
-let db;
+const jobsFile = path.join(process.cwd(), "jobs.json");
 
-function initDB() {
+console.log(`[jobQueue] Initialisation — fichier: ${jobsFile}`);
+
+// ─── Charger jobs du fichier ────────────────────────────────────────────────
+function loadJobs() {
   try {
-    const Database = require("better-sqlite3");
-    db = new Database(dbPath);
-
-    // Créer la table si elle n'existe pas
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS jobs (
-        id TEXT PRIMARY KEY,
-        status TEXT,
-        logs TEXT,
-        result TEXT,
-        error TEXT,
-        createdAt INTEGER
-      )
-    `);
-
-    // Nettoyer les vieux jobs (> 8h)
-    const cutoff = Date.now() - 8 * 60 * 60 * 1000;
-    const deleted = db
-      .prepare("DELETE FROM jobs WHERE createdAt < ?")
-      .run(cutoff).changes;
-    if (deleted > 0) console.log(`🧹 Nettoyage DB: ${deleted} jobs supprimés`);
-
-    console.log(
-      "✅ SQLite DB initialisée — jobs vont persister aux redémarrages",
-    );
+    if (fs.existsSync(jobsFile)) {
+      const data = fs.readFileSync(jobsFile, "utf8");
+      const jobs = JSON.parse(data || "{}");
+      console.log(
+        `[jobQueue] Chargé ${Object.keys(jobs).length} jobs depuis le fichier`,
+      );
+      return jobs;
+    }
   } catch (err) {
     console.warn(
-      `⚠️  better-sqlite3 non installé — fallback en mémoire.\n` +
-        `   Pour persistence: npm install better-sqlite3\n` +
-        `   Erreur: ${err.message}`,
+      `[jobQueue] Erreur lecture fichier: ${err.message} — recommence vierge`,
     );
-    db = null; // Fallback en mémoire
+  }
+  return {};
+}
+
+// ─── Sauvegarder jobs dans le fichier ────────────────────────────────────────
+function saveJobs(jobs) {
+  try {
+    fs.writeFileSync(jobsFile, JSON.stringify(jobs, null, 2), "utf8");
+    console.log(`[jobQueue] Sauvegardé ${Object.keys(jobs).length} jobs`);
+  } catch (err) {
+    console.error(`[jobQueue] ERREUR SAUVEGARDE: ${err.message}`);
   }
 }
 
-// Fallback en mémoire si DB non dispo
-const jobsInMemory = new Map();
+// ─── Nettoyer les vieux jobs ────────────────────────────────────────────────
+function cleanOldJobs(jobs) {
+  const cutoff = Date.now() - 8 * 60 * 60 * 1000; // 8h
+  let deleted = 0;
+  for (const [id, job] of Object.entries(jobs)) {
+    if (job.createdAt < cutoff) {
+      delete jobs[id];
+      deleted++;
+    }
+  }
+  if (deleted > 0) {
+    console.log(`[jobQueue] Nettoyage: ${deleted} jobs supprimés`);
+    saveJobs(jobs);
+  }
+  return jobs;
+}
+
+// État global
+let jobs = loadJobs();
+jobs = cleanOldJobs(jobs);
+
+console.log(`[jobQueue] ✅ Prêt — ${Object.keys(jobs).length} jobs en attente`);
+
+// ─── API ──────────────────────────────────────────────────────────────────────
 
 /**
  * Crée un nouveau job.
  */
 function createJob() {
   const jobId = randomUUID();
+
+  console.log(`\n[createJob] CRÉATION job: ${jobId}`);
+
   const ts = () =>
     new Date().toLocaleTimeString("fr-FR", {
       hour: "2-digit",
@@ -77,86 +94,46 @@ function createJob() {
     createdAt: Date.now(),
   };
 
-  // Sauvegarder immédiatement en DB
-  if (db) {
-    db.prepare(
-      "INSERT OR REPLACE INTO jobs (id, status, logs, result, error, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
-    ).run(
-      jobId,
-      job.status,
-      JSON.stringify(job.logs),
-      null,
-      null,
-      job.createdAt,
-    );
-  } else {
-    jobsInMemory.set(jobId, job);
-  }
+  // Sauvegarder immédiatement
+  jobs[jobId] = job;
+  saveJobs(jobs);
 
-  console.log(`[createJob] Nouveau job créé: ${jobId}`);
+  console.log(`[createJob] Job créé et SAUVEGARDÉ: ${jobId}`);
+  console.log(`[createJob] Total jobs en fichier: ${Object.keys(jobs).length}`);
 
   return {
     jobId,
 
     log(msg, type = "info") {
       const logEntry = { ts: ts(), msg, type };
-
-      if (db) {
-        // Récupérer, modifier, resauvegarder
-        const row = db.prepare("SELECT logs FROM jobs WHERE id = ?").get(jobId);
-        if (row) {
-          const logs = JSON.parse(row.logs);
-          logs.push(logEntry);
-          db.prepare("UPDATE jobs SET logs = ? WHERE id = ?").run(
-            JSON.stringify(logs),
-            jobId,
-          );
-        }
-      } else {
-        const j = jobsInMemory.get(jobId);
-        if (j) j.logs.push(logEntry);
+      const j = jobs[jobId];
+      if (j) {
+        j.logs.push(logEntry);
+        saveJobs(jobs); // Sauvegarder après chaque log
       }
-
       console.log(`[${jobId}] ${msg}`);
     },
 
     done(data) {
-      if (db) {
-        db.prepare("UPDATE jobs SET status = ?, result = ? WHERE id = ?").run(
-          "done",
-          JSON.stringify(data),
-          jobId,
-        );
-      } else {
-        const j = jobsInMemory.get(jobId);
-        if (j) {
-          j.status = "done";
-          j.result = data;
-        }
+      const j = jobs[jobId];
+      if (j) {
+        j.status = "done";
+        j.result = data;
+        saveJobs(jobs);
       }
-      console.log(`[${jobId}] Job terminé avec succès`);
+      console.log(`[${jobId}] ✅ DONE — sauvegardé`);
     },
 
     fail(err) {
       const errMsg = err?.message || String(err);
-      if (db) {
-        const row = db.prepare("SELECT logs FROM jobs WHERE id = ?").get(jobId);
-        if (row) {
-          const logs = JSON.parse(row.logs);
-          logs.push({ ts: ts(), msg: `❌ ${errMsg}`, type: "error" });
-          db.prepare(
-            "UPDATE jobs SET status = ?, error = ?, logs = ? WHERE id = ?",
-          ).run("error", errMsg, JSON.stringify(logs), jobId);
-        }
-      } else {
-        const j = jobsInMemory.get(jobId);
-        if (j) {
-          j.status = "error";
-          j.error = errMsg;
-          j.logs.push({ ts: ts(), msg: `❌ ${errMsg}`, type: "error" });
-        }
+      const j = jobs[jobId];
+      if (j) {
+        j.status = "error";
+        j.error = errMsg;
+        j.logs.push({ ts: ts(), msg: `❌ ${errMsg}`, type: "error" });
+        saveJobs(jobs);
       }
-      console.log(`[${jobId}] Job échoué: ${errMsg}`);
+      console.log(`[${jobId}] ❌ FAIL — ${errMsg} — sauvegardé`);
     },
   };
 }
@@ -165,55 +142,41 @@ function createJob() {
  * Retourne l'état d'un job.
  */
 function getJobStatus(jobId, cursor = 0) {
-  let job;
+  console.log(
+    `[getJobStatus] Demande: ${jobId} | Jobs existants: ${Object.keys(jobs).join(", ")}`,
+  );
 
-  if (db) {
-    const row = db
-      .prepare("SELECT id, status, logs, result, error FROM jobs WHERE id = ?")
-      .get(jobId);
-    if (!row) return { found: false };
+  const job = jobs[jobId];
 
-    const logs = JSON.parse(row.logs);
-    const result = row.result ? JSON.parse(row.result) : null;
-    return {
-      found: true,
-      status: row.status,
-      newLogs: logs.slice(cursor),
-      cursor: logs.length,
-      result,
-      error: row.error,
-    };
-  } else {
-    job = jobsInMemory.get(jobId);
-    if (!job) return { found: false };
-
-    return {
-      found: true,
-      status: job.status,
-      newLogs: job.logs.slice(cursor),
-      cursor: job.logs.length,
-      result: job.result,
-      error: job.error,
-    };
+  if (!job) {
+    console.log(`[getJobStatus] NOT FOUND: ${jobId}`);
+    return { found: false };
   }
+
+  const newLogs = job.logs.slice(cursor);
+  console.log(
+    `[getJobStatus] FOUND: ${jobId} | statut: ${job.status} | nouveaux logs: ${newLogs.length}`,
+  );
+
+  return {
+    found: true,
+    status: job.status,
+    newLogs,
+    cursor: job.logs.length,
+    result: job.result,
+    error: job.error,
+  };
 }
 
 /**
  * Retourne tous les jobs (pour debug).
  */
 function getAllJobs() {
-  if (db) {
-    const rows = db.prepare("SELECT id, status FROM jobs").all();
-    return rows.map((r) => ({ id: r.id, status: r.status }));
-  } else {
-    return Array.from(jobsInMemory.values()).map((j) => ({
-      id: j.id,
-      status: j.status,
-    }));
-  }
+  return Object.values(jobs).map((j) => ({
+    id: j.id,
+    status: j.status,
+    logsCount: j.logs.length,
+  }));
 }
-
-// Initialiser au démarrage
-initDB();
 
 module.exports = { createJob, getJobStatus, getAllJobs };
