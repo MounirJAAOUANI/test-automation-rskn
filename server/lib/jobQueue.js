@@ -39,6 +39,7 @@ setInterval(
  */
 function createJob() {
   const jobId = randomUUID();
+  console.log(`[${process.pid}] createJob => ${jobId}`);
   const job = {
     id: jobId,
     status: "running",
@@ -80,6 +81,7 @@ function createJob() {
  * @returns {{ found, status, newLogs, cursor, result, error }}
  */
 function getJobStatus(jobId, cursor = 0) {
+  console.log(`[${process.pid}] getJobStatus => ${jobId}`);
   const job = jobs.get(jobId);
   if (!job) return { found: false };
 
