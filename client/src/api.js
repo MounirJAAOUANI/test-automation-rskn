@@ -149,14 +149,6 @@ export async function runBuildAgent(payload, onLog, onDone, onError) {
     let state;
     try {
       const res = await fetch(`${BASE}/jobs/${jobId}?cursor=${cursor}`);
-      if (res.status === 404) {
-        onError({
-          msg: `Job ${jobId} introuvable sur le serveur`,
-          detail: "Le job a été perdu ou traité par une autre instance Railway",
-        });
-        return;
-      }
-
       if (!res.ok) {
         // Erreur réseau temporaire — on continue
         onLog({
