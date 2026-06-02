@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Politique de Confidentialité — Intentio</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      line-height: 1.7;
+      color: #334155;
+      background: linear-gradient(135deg, #7C3AEDdd 0%, #7C3AED99 100%);
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+    .hero {
+      background: linear-gradient(135deg, #7C3AED 0%, #7C3AEDcc 100%);
+      color: #fff;
+      padding: 48px 40px 40px;
+      text-align: center;
+    }
+    .hero h1 { font-size: 2rem; font-weight: 800; margin-bottom: 12px; }
+    .hero .meta { font-size: 0.9rem; opacity: 0.9; line-height: 1.8; }
+    .hero .badge {
+      display: inline-block; margin-top: 14px;
+      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 30px; padding: 4px 16px; font-size: 0.8rem;
+    }
+    .body { padding: 40px; }
+    h2 {
+      color: #7C3AED; font-size: 1.3rem; font-weight: 700;
+      margin: 36px 0 14px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #7C3AED33;
+    }
+    h2:first-child { margin-top: 0; }
+    h3 { color: #1e293b; font-size: 1.05rem; font-weight: 600; margin: 20px 0 8px; }
+    p  { margin-bottom: 14px; color: #475569; }
+    ul, ol { margin: 0 0 16px 24px; }
+    li { margin-bottom: 8px; color: #475569; }
+    a  { color: #7C3AED; }
+    strong { color: #1e293b; }
+    .info-box {
+      background: #7C3AED15;
+      border-left: 4px solid #7C3AED;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 18px; margin: 18px 0;
+    }
+    .warn-box {
+      background: #fff7ed;
+      border-left: 4px solid #f97316;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 18px; margin: 18px 0;
+    }
+    .sdk-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 14px; margin: 18px 0;
+    }
+    .sdk-card {
+      background: #f8fafc; border: 1px solid #e2e8f0;
+      border-radius: 10px; padding: 16px;
+    }
+    .sdk-card .sdk-name { font-weight: 700; color: #7C3AED; margin-bottom: 6px; }
+    .sdk-card p { margin: 0; font-size: 0.88rem; }
+    table {
+      width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 0.9rem;
+    }
+    th {
+      background: #7C3AED; color: #fff;
+      padding: 10px 14px; text-align: left; font-weight: 600;
+    }
+    td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; color: #475569; }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: #f8fafc; }
+    .rights-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px; margin: 18px 0;
+    }
+    .right-card {
+      background: #7C3AED15; border: 1px solid #7C3AED33;
+      border-radius: 10px; padding: 14px;
+    }
+    .right-card .right-title { font-weight: 700; color: #7C3AED; margin-bottom: 6px; }
+    .right-card p { margin: 0; font-size: 0.85rem; }
+    .contact-box {
+      background: #f1f5f9; border-radius: 10px;
+      padding: 20px 24px; margin: 18px 0;
+    }
+    .contact-box p { margin-bottom: 6px; }
+    .footer {
+      background: #f8fafc; border-top: 1px solid #e2e8f0;
+      padding: 24px 40px; text-align: center;
+      font-size: 0.85rem; color: #94a3b8;
+    }
+    .footer strong { color: #7C3AED; }
+    @media (max-width: 600px) {
+      .body { padding: 24px 20px; }
+      .hero { padding: 32px 20px 28px; }
+      .hero h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div style="font-size:2.5rem;margin-bottom:12px">🔒</div>
+    <h1>Politique de Confidentialité</h1>
+    <div class="meta">
+      <strong>Intentio</strong><br>
+      Package : <code>com.appfactory.intentio</code><br>
+      Version 1.0
+    </div>
+    <div class="badge">Conforme RGPD &amp; Google Play 2026</div>
+  </div>
+
+  <!-- BODY -->
+  <div class="body">
+
+    <h2>1. Introduction</h2>
+    <p>
+      <strong>Intentio</strong> (« l'Application ») respecte votre vie privée et s'engage à protéger
+      vos données personnelles conformément au <strong>Règlement Général sur la Protection des Données (RGPD)</strong>
+      (UE 2016/679) et aux politiques du <strong>Google Play Store 2026</strong>.
+    </p>
+    <div class="info-box">
+      <strong>Responsable du traitement :</strong> App Factory<br>
+      <strong>Email :</strong> <a href="mailto:privacy@appfactory.dev">privacy@appfactory.dev</a><br>
+      <strong>Application :</strong> Intentio (com.appfactory.intentio)<br>
+      <strong>Dernière mise à jour :</strong> 2 juin 2026
+    </div>
+
+    <h2>2. Données collectées</h2>
+    <p>
+      Nous collectons uniquement les données strictement nécessaires au bon fonctionnement de l'Application.
+    </p>
+
+    <h3>2.1 Données collectées automatiquement</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Type de donnée</th>
+          <th>Finalité</th>
+          <th>Base légale</th>
+          <th>Durée de conservation</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        
+        
+        <tr>
+          <td>Token de notification push</td>
+          <td>Envoi de notifications</td>
+          <td>Consentement (Art. 6.1.a RGPD)</td>
+          <td>Jusqu'à révocation</td>
+        </tr>
+        <tr>
+          <td>Données d'utilisation (crashs, performances)</td>
+          <td>Amélioration de l'Application</td>
+          <td>Intérêt légitime (Art. 6.1.f RGPD)</td>
+          <td>90 jours</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>2.2 Données stockées localement</h3>
+    <p>
+      Les données de l'application (préférences, contenu généré par l'utilisateur) sont stockées
+      <strong>uniquement sur votre appareil</strong> via le stockage local (SharedPreferences).
+      Ces données ne sont jamais transmises à nos serveurs.
+    </p>
+
+    <h3>2.3 Données que nous ne collectons PAS</h3>
+    <ul>
+      <li>Nom, prénom, adresse email ou numéro de téléphone</li>
+      <li>Données de localisation précise</li>
+      <li>Données financières ou bancaires directes</li>
+      <li>Données de santé</li>
+      <li>Photos, contacts ou fichiers de votre appareil</li>
+    </ul>
+
+    
+
+    
+
+    
+
+    <h2>6. Transfert international de données</h2>
+    <p>
+      Google LLC est établie aux États-Unis. Les données collectées par les SDKs Google (AdMob, Firebase)
+      peuvent être transférées et traitées aux États-Unis et dans d'autres pays.
+      Ces transferts sont encadrés par les <strong>Clauses Contractuelles Types (CCT)</strong> de la Commission européenne,
+      conformément à l'article 46 du RGPD.
+    </p>
+
+    <h2>7. Durée de conservation</h2>
+    <p>
+      Nous conservons vos données uniquement le temps nécessaire aux finalités décrites dans cette politique.
+      Les données locales (stockage de l'appareil) sont supprimées automatiquement à la désinstallation de l'Application.
+    </p>
+
+    <h2>8. Vos droits RGPD</h2>
+    <p>
+      Conformément au RGPD, vous disposez des droits suivants concernant vos données personnelles :
+    </p>
+    <div class="rights-grid">
+      <div class="right-card">
+        <div class="right-title">📋 Droit d'accès</div>
+        <p>Obtenir une copie de vos données personnelles traitées.</p>
+      </div>
+      <div class="right-card">
+        <div class="right-title">✏️ Droit de rectification</div>
+        <p>Corriger des données inexactes ou incomplètes.</p>
+      </div>
+      <div class="right-card">
+        <div class="right-title">🗑️ Droit à l'effacement</div>
+        <p>Demander la suppression de vos données ("droit à l'oubli").</p>
+      </div>
+      <div class="right-card">
+        <div class="right-title">⏸️ Droit à la limitation</div>
+        <p>Limiter le traitement de vos données dans certains cas.</p>
+      </div>
+      <div class="right-card">
+        <div class="right-title">📦 Droit à la portabilité</div>
+        <p>Recevoir vos données dans un format structuré et lisible.</p>
+      </div>
+      <div class="right-card">
+        <div class="right-title">🚫 Droit d'opposition</div>
+        <p>Vous opposer au traitement basé sur l'intérêt légitime.</p>
+      </div>
+      <div class="right-card">
+        <div class="right-title">🔙 Retrait du consentement</div>
+        <p>Retirer votre consentement à tout moment, sans effet rétroactif.</p>
+      </div>
+      <div class="right-card">
+        <div class="right-title">⚖️ Droit de réclamation</div>
+        <p>Déposer une plainte auprès de la CNIL (cnil.fr).</p>
+      </div>
+    </div>
+    <p>
+      Pour exercer ces droits, contactez-nous à :{" "}
+      <a href="mailto:privacy@appfactory.dev">privacy@appfactory.dev</a>.
+      Nous répondrons dans un délai de <strong>30 jours</strong> maximum.
+    </p>
+
+    <h2>9. Consentement (Google UMP)</h2>
+    <p>
+      Conformément aux exigences de Google Play et au RGPD, l'Application intègre
+      <strong>Google User Messaging Platform (UMP)</strong> pour recueillir votre consentement
+      aux traitements nécessitant une base légale de consentement (publicités personnalisées).
+    </p>
+    <div class="info-box">
+      Vous pouvez modifier vos préférences de consentement à tout moment via les
+      <strong>Paramètres de l'Application → Confidentialité</strong> ou en désinstallant l'Application.
+    </div>
+
+    <h2>10. Sécurité des données</h2>
+    <p>
+      Nous mettons en œuvre des mesures techniques et organisationnelles appropriées pour protéger
+      vos données contre tout accès non autorisé, toute modification, divulgation ou destruction.
+    </p>
+    <ul>
+      <li>Toutes les communications avec les serveurs externes utilisent le protocole <strong>HTTPS/TLS 1.3</strong>.</li>
+      <li>Les données locales sont stockées dans le sandbox sécurisé d'Android.</li>
+      <li>Aucune donnée sensible n'est stockée en clair.</li>
+    </ul>
+
+    <h2>11. Enfants (COPPA)</h2>
+    <p>
+      L'Application n'est pas destinée aux enfants de moins de <strong>13 ans</strong>.
+      Nous ne collectons pas sciemment de données personnelles auprès de mineurs de moins de 13 ans.
+      Si vous êtes parent ou tuteur et pensez que votre enfant nous a fourni des données,
+      contactez-nous à <a href="mailto:privacy@appfactory.dev">privacy@appfactory.dev</a>.
+    </p>
+
+    <h2>12. Modifications de cette politique</h2>
+    <p>
+      Nous pouvons mettre à jour cette Politique de Confidentialité périodiquement.
+      La date de dernière mise à jour est indiquée en haut de ce document.
+      En cas de modification substantielle, nous vous en informerons via une notification dans l'Application.
+    </p>
+    <p>
+      L'utilisation continue de l'Application après toute modification constitue votre acceptation
+      de la nouvelle politique.
+    </p>
+
+    <h2>13. Contact</h2>
+    <div class="contact-box">
+      <p><strong>App Factory — Responsable de la protection des données</strong></p>
+      <p>Email : <a href="mailto:privacy@appfactory.dev">privacy@appfactory.dev</a></p>
+      <p>Application : Intentio (<code>com.appfactory.intentio</code>)</p>
+      <p>Autorité de contrôle : <a href="https://www.cnil.fr" target="_blank" rel="noopener">CNIL — cnil.fr</a></p>
+    </div>
+
+  </div><!-- /body -->
+
+  <div class="footer">
+    <p>
+      <strong>Intentio</strong> — Politique de Confidentialité<br>
+      Dernière mise à jour : 2 juin 2026<br>
+      Conforme RGPD (UE 2016/679) &amp; Google Play Store 2026
+    </p>
+  </div>
+
+</div><!-- /container -->
+</body>
+</html>
