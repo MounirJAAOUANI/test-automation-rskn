@@ -27,7 +27,10 @@ async function startGitHubPoller(jobId, workflowRunId, onLog, onStatusChange) {
     return;
   }
 
-  onLog?.(`Démarrage surveillance GitHub Actions (runId: ${workflowRunId})`, "info");
+  onLog?.(
+    `Démarrage surveillance GitHub Actions (runId: ${workflowRunId})`,
+    "info",
+  );
 
   let attempts = 0;
   const maxAttempts = 90; // 15 minutes (90 * 10s)
@@ -56,7 +59,7 @@ async function startGitHubPoller(jobId, workflowRunId, onLog, onStatusChange) {
         onLog?.(`❌ Build GitHub échoué (${timeStr})`, "error");
         clearInterval(pollerId);
         activePollers.delete(jobId);
-        onStatusChange?(status, { runId: workflowRunId });
+        onStatusChange?.(status, { runId: workflowRunId });
         return;
       }
 
@@ -64,8 +67,9 @@ async function startGitHubPoller(jobId, workflowRunId, onLog, onStatusChange) {
       const displayStatus = status === "queued" ? "en attente" : "en cours";
       onLog?.(`Build GitHub ${displayStatus} (${timeStr})...`, "data");
 
-      console.log(`[github-poller] Run ${workflowRunId} → ${status} (${timeStr})`);
-
+      console.log(
+        `[github-poller] Run ${workflowRunId} → ${status} (${timeStr})`,
+      );
     } catch (err) {
       onLog?.(`⚠️  Erreur poll GitHub: ${err.message}`, "warn");
       console.warn(`[github-poller] Poll error: ${err.message}`);
