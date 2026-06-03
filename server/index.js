@@ -135,15 +135,23 @@ app.get("/api/health", (_req, res) => {
 });
 
 // ─── POLL ─────────────────────────────────────────────────────────────────────
-app.get("/api/jobs/:jobId", (req, res) => {
+app.get("/api/jobs/:jobId", async (req, res) => {
   const { jobId } = req.params;
   const cursor = parseInt(req.query.cursor || "0", 10);
-  const state = getJobStatus(jobId, cursor);
+  const state = await getJobStatus(jobId, cursor);
+
+  // FIX CRITIQUE : Jamais 404 pour "job non trouvé"
+  // Retourner 200 avec statut explicite au lieu
   if (!state.found) {
-    return res
-      .status(404)
-      .json({ error: `Job NOT FOUND`, availableJobs: getAllJobs() });
+    return res.json({
+      found: false,
+      status: "lost",
+      error: "Job introuvable après redémarrage serveur",
+      newLogs: [],
+      cursor: 0,
+    });
   }
+
   res.json(state);
 });
 

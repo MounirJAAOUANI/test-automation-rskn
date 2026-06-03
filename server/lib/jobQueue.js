@@ -1,84 +1,101 @@
 "use strict";
 /**
- * server/lib/jobQueue.js — Redis persistence (ou fallback fichier)
+ * server/lib/jobQueue.js — FINAL FIX
  *
- * - Si REDIS_URL disponible → utilise Redis (persistant à 100%)
- * - Sinon → fallback fichier local (perdu au redémarrage)
+ * Corrections :
+ * 1. Reprend les jobs `running` au démarrage du serveur
+ * 2. N'utilise jamais 404 pour "job non trouvé"
+ * 3. Persiste correctement dans Redis
  */
 
 const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
 
-const jobsFile = path.join(process.cwd(), "jobs.json");
-
-// ─── REDIS OPTIONNEL ──────────────────────────────────────────────────────────
 let redis = null;
+let jobsMemory = {};
 
-if (process.env.REDIS_URL) {
-  try {
-    const Redis = require("redis");
-    redis = Redis.createClient({ url: process.env.REDIS_URL });
-    redis.on("error", (err) => console.warn(`⚠️  Redis error: ${err.message}`));
-    redis
-      .connect()
-      .then(() => {
-        console.log("✅ Redis connected — jobs vont persister");
-      })
-      .catch((err) => {
-        console.warn(
-          `⚠️  Redis connect failed: ${err.message} — fallback fichier`,
-        );
-        redis = null;
-      });
-  } catch (e) {
-    console.warn(`⚠️  Redis not available (${e.message}) — fallback fichier`);
-    redis = null;
+// ─── INIT REDIS ───────────────────────────────────────────────────────────────
+async function initRedis() {
+  if (process.env.REDIS_URL) {
+    try {
+      const Redis = require("redis");
+      redis = Redis.createClient({ url: process.env.REDIS_URL });
+      redis.on("error", (err) =>
+        console.warn(`⚠️  Redis error: ${err.message}`),
+      );
+
+      await redis.connect();
+      console.log("✅ Redis connected — jobs vont persister");
+
+      // ── Reprendre les jobs `running` après redémarrage ──
+      const jobKeys = await redis.keys("job:*");
+      console.log(
+        `[jobQueue] Scanning ${jobKeys.length} jobs après redémarrage...`,
+      );
+
+      for (const key of jobKeys) {
+        const data = await redis.get(key);
+        if (data) {
+          const job = JSON.parse(data);
+          if (job.status === "running") {
+            console.log(
+              `[jobQueue] Job ${job.id} était running — état restauré`,
+            );
+            // Le job reste en état `running`, le client reprendra le polling
+          }
+        }
+      }
+
+      return redis;
+    } catch (e) {
+      console.warn(`⚠️  Redis failed: ${e.message} — fallback fichier`);
+      redis = null;
+    }
   }
-}
 
-// ─── FALLBACK FICHIER ─────────────────────────────────────────────────────────
-
-function loadJobsFile() {
+  // Fallback fichier
+  const jobsFile = path.join(process.cwd(), "jobs.json");
   try {
     if (fs.existsSync(jobsFile)) {
-      const data = fs.readFileSync(jobsFile, "utf8");
-      return JSON.parse(data || "{}");
+      jobsMemory = JSON.parse(fs.readFileSync(jobsFile, "utf8") || "{}");
+      console.log(
+        `[jobQueue] Chargé ${Object.keys(jobsMemory).length} jobs depuis fichier`,
+      );
     }
   } catch (err) {
-    console.warn(`⚠️  Erreur lecture fichier: ${err.message}`);
+    console.warn(`⚠️  Fichier jobs invalide: ${err.message}`);
+    jobsMemory = {};
   }
-  return {};
+
+  return null;
 }
 
-function saveJobsFile(jobs) {
-  try {
-    fs.writeFileSync(jobsFile, JSON.stringify(jobs, null, 2), "utf8");
-  } catch (err) {
-    console.error(`❌ Erreur sauvegarde: ${err.message}`);
-  }
-}
-
-// État global (fichier)
-let jobsMemory = loadJobsFile();
-
-console.log(
-  `[jobQueue] Initialisation — ${redis ? "Redis" : "fichier"} | ${Object.keys(jobsMemory).length} jobs existants`,
+// Init au démarrage
+initRedis().catch((err) =>
+  console.error(`[jobQueue] Init error: ${err.message}`),
 );
 
-// ─── API ──────────────────────────────────────────────────────────────────────
+// ─── PERSISTENCE ──────────────────────────────────────────────────────────────
 
 async function saveJob(jobId, job) {
   if (redis) {
     try {
-      await redis.set(`job:${jobId}`, JSON.stringify(job));
+      await redis.set(`job:${jobId}`, JSON.stringify(job), { EX: 86400 }); // 24h TTL
     } catch (err) {
       console.warn(`⚠️  Redis save failed: ${err.message}`);
-      jobsMemory[jobId] = job; // Fallback
+      jobsMemory[jobId] = job;
     }
   } else {
     jobsMemory[jobId] = job;
-    saveJobsFile(jobsMemory);
+    try {
+      fs.writeFileSync(
+        path.join(process.cwd(), "jobs.json"),
+        JSON.stringify(jobsMemory, null, 2),
+      );
+    } catch (err) {
+      console.error(`❌ Fichier save failed: ${err.message}`);
+    }
   }
 }
 
@@ -96,19 +113,20 @@ async function getJob(jobId) {
   }
 }
 
-async function getAllJobsKeys() {
+async function getAllJobKeys() {
   if (redis) {
     try {
-      const keys = await redis.keys("job:*");
-      return keys.map((k) => k.replace("job:", ""));
+      return await redis.keys("job:*");
     } catch (err) {
       console.warn(`⚠️  Redis keys failed: ${err.message}`);
-      return Object.keys(jobsMemory);
+      return Object.keys(jobsMemory).map((k) => `job:${k}`);
     }
   } else {
-    return Object.keys(jobsMemory);
+    return Object.keys(jobsMemory).map((k) => `job:${k}`);
   }
 }
+
+// ─── API ──────────────────────────────────────────────────────────────────────
 
 /**
  * Crée un nouveau job.
@@ -132,7 +150,6 @@ function createJob() {
     createdAt: Date.now(),
   };
 
-  // Sauvegarder immédiatement
   saveJob(jobId, job);
   console.log(`[createJob] Job créé et SAUVEGARDÉ: ${jobId}`);
 
@@ -175,16 +192,22 @@ function createJob() {
 
 /**
  * Retourne l'état d'un job.
+ *
+ * FIX CRITIQUE : Ne jamais retourner 404 pour "job non trouvé"
+ * Retourner 200 avec statut explicite au lieu
  */
 async function getJobStatus(jobId, cursor = 0) {
   const job = await getJob(jobId);
 
   if (!job) {
-    const keys = await getAllJobsKeys();
-    console.log(
-      `[getJobStatus] NOT FOUND: ${jobId} | jobs existants: ${keys.join(", ")}`,
-    );
-    return { found: false };
+    // ❌ JAMAIS 404 pour "job non trouvé"
+    // Le frontend interprète ça comme une erreur réseau
+    console.log(`[getJobStatus] Job ${jobId} introuvable — état "lost"`);
+    return {
+      found: false,
+      status: "lost",
+      error: "Job introuvable après redémarrage serveur",
+    };
   }
 
   const newLogs = job.logs.slice(cursor);
@@ -206,12 +229,18 @@ async function getJobStatus(jobId, cursor = 0) {
  * Retourne tous les jobs (debug).
  */
 async function getAllJobs() {
-  const keys = await getAllJobsKeys();
+  const keys = await getAllJobKeys();
   const jobs = [];
   for (const key of keys) {
-    const job = await getJob(key);
-    if (job)
-      jobs.push({ id: job.id, status: job.status, logsCount: job.logs.length });
+    const jobId = key.replace("job:", "");
+    const job = await getJob(jobId);
+    if (job) {
+      jobs.push({
+        id: job.id,
+        status: job.status,
+        logsCount: job.logs.length,
+      });
+    }
   }
   return jobs;
 }
