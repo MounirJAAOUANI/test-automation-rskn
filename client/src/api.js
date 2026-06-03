@@ -88,7 +88,7 @@ export function runBuildAgent(payload, onLog, onDone, onError) {
 
       let cursor = 0;
       let attempts = 0;
-      const maxAttempts = 900; // 15 minutes
+      const maxAttempts = 2700; // 45 minutes
 
       while (attempts < maxAttempts) {
         try {
@@ -149,7 +149,7 @@ export function runBuildAgent(payload, onLog, onDone, onError) {
       }
 
       // Timeout
-      onError?.({ msg: "Timeout client après 15 minutes" });
+      onError?.({ msg: "Timeout client après 45 minutes" });
     } catch (err) {
       onError?.({ msg: err.message || String(err) });
     }

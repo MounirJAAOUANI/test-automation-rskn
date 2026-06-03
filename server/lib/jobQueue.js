@@ -1,16 +1,12 @@
 "use strict";
 /**
- * server/lib/jobQueue.js — FINAL FIX
- *
- * Corrections :
- * 1. Reprend les jobs `running` au démarrage du serveur
- * 2. N'utilise jamais 404 pour "job non trouvé"
- * 3. Persiste correctement dans Redis
+ * server/lib/jobQueue.js — FINAL avec reprise des pollers GitHub
  */
 
 const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
+const { startGitHubPoller } = require("./github-poller");
 
 let redis = null;
 let jobsMemory = {};
@@ -26,9 +22,9 @@ async function initRedis() {
       );
 
       await redis.connect();
-      console.log("✅ Redis connected — jobs vont persister");
+      console.log("✅ Redis connected");
 
-      // ── Reprendre les jobs `running` après redémarrage ──
+      // ── FIX STRUCTUREL : Reprendre les jobs `running` ──
       const jobKeys = await redis.keys("job:*");
       console.log(
         `[jobQueue] Scanning ${jobKeys.length} jobs après redémarrage...`,
@@ -38,18 +34,43 @@ async function initRedis() {
         const data = await redis.get(key);
         if (data) {
           const job = JSON.parse(data);
-          if (job.status === "running") {
+          if (job.status === "running" && job.workflowRunId) {
             console.log(
-              `[jobQueue] Job ${job.id} était running — état restauré`,
+              `[jobQueue] 🔄 Reprise surveillance: ${job.id} (run ${job.workflowRunId})`,
             );
-            // Le job reste en état `running`, le client reprendra le polling
+
+            // Relancer le poller GitHub
+            startGitHubPoller(
+              job.id,
+              job.workflowRunId,
+              async (status, data) => {
+                // Callback quand le run est terminé
+                if (status === "completed") {
+                  const j = await getJob(job.id);
+                  if (j) {
+                    j.status = "done";
+                    j.result = data;
+                    await saveJob(job.id, j);
+                    console.log(`[jobQueue] Job ${job.id} marqué DONE`);
+                  }
+                } else if (status === "failure") {
+                  const j = await getJob(job.id);
+                  if (j) {
+                    j.status = "error";
+                    j.error = "GitHub Actions build failed";
+                    await saveJob(job.id, j);
+                    console.log(`[jobQueue] Job ${job.id} marqué ERROR`);
+                  }
+                }
+              },
+            );
           }
         }
       }
 
       return redis;
     } catch (e) {
-      console.warn(`⚠️  Redis failed: ${e.message} — fallback fichier`);
+      console.warn(`⚠️  Redis failed: ${e.message}`);
       redis = null;
     }
   }
@@ -59,12 +80,10 @@ async function initRedis() {
   try {
     if (fs.existsSync(jobsFile)) {
       jobsMemory = JSON.parse(fs.readFileSync(jobsFile, "utf8") || "{}");
-      console.log(
-        `[jobQueue] Chargé ${Object.keys(jobsMemory).length} jobs depuis fichier`,
-      );
+      console.log(`[jobQueue] Chargé ${Object.keys(jobsMemory).length} jobs`);
     }
   } catch (err) {
-    console.warn(`⚠️  Fichier jobs invalide: ${err.message}`);
+    console.warn(`⚠️  Fichier erreur: ${err.message}`);
     jobsMemory = {};
   }
 
@@ -81,7 +100,7 @@ initRedis().catch((err) =>
 async function saveJob(jobId, job) {
   if (redis) {
     try {
-      await redis.set(`job:${jobId}`, JSON.stringify(job), { EX: 86400 }); // 24h TTL
+      await redis.set(`job:${jobId}`, JSON.stringify(job), { EX: 86400 });
     } catch (err) {
       console.warn(`⚠️  Redis save failed: ${err.message}`);
       jobsMemory[jobId] = job;
@@ -147,11 +166,12 @@ function createJob() {
     logs: [],
     result: null,
     error: null,
+    workflowRunId: null, // ← IMPORTANT : pour relancer après redémarrage
     createdAt: Date.now(),
   };
 
   saveJob(jobId, job);
-  console.log(`[createJob] Job créé et SAUVEGARDÉ: ${jobId}`);
+  console.log(`[createJob] Job créé: ${jobId}`);
 
   return {
     jobId,
@@ -164,6 +184,14 @@ function createJob() {
         await saveJob(jobId, j);
       }
       console.log(`[${jobId}] ${msg}`);
+    },
+
+    async setWorkflowRunId(runId) {
+      const j = await getJob(jobId);
+      if (j) {
+        j.workflowRunId = runId;
+        await saveJob(jobId, j);
+      }
     },
 
     async done(data) {
@@ -185,35 +213,26 @@ function createJob() {
         j.logs.push({ ts: ts(), msg: `❌ ${errMsg}`, type: "error" });
         await saveJob(jobId, j);
       }
-      console.log(`[${jobId}] ❌ FAIL — ${errMsg}`);
+      console.log(`[${jobId}] ❌ FAIL`);
     },
   };
 }
 
 /**
  * Retourne l'état d'un job.
- *
- * FIX CRITIQUE : Ne jamais retourner 404 pour "job non trouvé"
- * Retourner 200 avec statut explicite au lieu
  */
 async function getJobStatus(jobId, cursor = 0) {
   const job = await getJob(jobId);
 
   if (!job) {
-    // ❌ JAMAIS 404 pour "job non trouvé"
-    // Le frontend interprète ça comme une erreur réseau
-    console.log(`[getJobStatus] Job ${jobId} introuvable — état "lost"`);
     return {
       found: false,
       status: "lost",
-      error: "Job introuvable après redémarrage serveur",
+      error: "Job introuvable",
     };
   }
 
   const newLogs = job.logs.slice(cursor);
-  console.log(
-    `[getJobStatus] FOUND: ${jobId} | ${job.status} | ${newLogs.length} nouveaux logs`,
-  );
 
   return {
     found: true,
