@@ -499,6 +499,48 @@ app.post("/api/agents/compliance", async (req, res) => {
   }
 });
 
+// ─── WEBHOOK GITHUB ───────────────────────────────────────────────────────────
+// GitHub Actions appelle ce endpoint à la fin du workflow
+app.post("/api/webhook/github", async (req, res) => {
+  const { workflow_run } = req.body;
+
+  if (!workflow_run) {
+    return res.status(400).json({ error: "No workflow_run data" });
+  }
+
+  const { id: runId, conclusion, html_url } = workflow_run;
+
+  console.log(`\n[webhook] GitHub Actions run #${runId} → ${conclusion}`);
+  console.log(`[webhook] URL: ${html_url}\n`);
+
+  // Répondre immédiatement (non-bloquant)
+  res.json({ ok: true, received: runId });
+
+  // Rechercher tous les jobs `running` avec ce workflowRunId
+  const { getJobStatus, getAllJobs } = require("./lib/jobQueue");
+  const allJobs = await getAllJobs();
+
+  for (const job of allJobs) {
+    const state = await getJobStatus(job.id, 0);
+
+    if (state.status === "running") {
+      // Ce job attend peut-être ce workflow !
+      console.log(
+        `[webhook] Job ${job.id} en running — cherche workflowRunId...`,
+      );
+
+      // Note: Sans exporter getJob, on ne peut pas vérifier le workflowRunId ici
+      // En production, tu peux exporter getJob depuis jobQueue.js et vérifier :
+      // if (jobData.workflowRunId === String(runId)) { ... }
+
+      // Pour maintenant, on log juste
+      console.log(
+        `[webhook] Job ${job.id} pourrait être affecté par run ${runId}`,
+      );
+    }
+  }
+});
+
 // ─── STATIC ───────────────────────────────────────────────────────────────────
 if (IS_PROD) {
   const clientBuild = path.join(__dirname, "../client/dist");

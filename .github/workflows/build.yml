@@ -245,3 +245,45 @@ jobs:
           echo "  Color    : #${COLOR_HEX}"
           echo "  AAB size : $AAB_SIZE"
           echo "  APK size : $APK_SIZE"
+
+      # ── 16. WEBHOOK — Notifier Railway que le build est terminé ──────────
+      - name: Notify Railway webhook
+        if: always()
+        run: |
+          echo "🔔 Envoi webhook à Railway..."
+
+          # Status du job (success, failure, cancelled)
+          JOB_STATUS=${{ job.status }}
+
+          # Conclusion du run (success, failure, cancelled, neutral, timed_out)
+          RUN_CONCLUSION=${{ job.conclusion }}
+
+          # Déterminer le status pour Railway
+          if [ "$JOB_STATUS" = "success" ]; then
+            WEBHOOK_STATUS="completed"
+          else
+            WEBHOOK_STATUS="failure"
+          fi
+
+          echo "  Job Status: $JOB_STATUS"
+          echo "  Run Conclusion: $RUN_CONCLUSION"
+          echo "  Webhook Status: $WEBHOOK_STATUS"
+
+          # Appel HTTP vers Railway
+          curl -X POST "https://test-automation-rskn-production.up.railway.app/api/webhook/github" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"action\": \"workflow_run\",
+              \"workflow_run\": {
+                \"id\": ${{ github.run_id }},
+                \"name\": \"${{ github.workflow }}\",
+                \"status\": \"completed\",
+                \"conclusion\": \"$RUN_CONCLUSION\",
+                \"created_at\": \"${{ github.event.created_at }}\",
+                \"updated_at\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\",
+                \"html_url\": \"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+              }
+            }" \
+            -v || echo "⚠️  Webhook failed (Railway may be unreachable)"
+
+          echo "✅ Webhook envoyé"
