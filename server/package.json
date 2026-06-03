@@ -11,6 +11,7 @@
     "node": ">=24.11.1"
   },
   "dependencies": {
+    "redis": "^4.6.12",
     "@anthropic-ai/sdk": "^0.39.0",
     "adm-zip": "^0.5.10",
     "cors": "^2.8.5",

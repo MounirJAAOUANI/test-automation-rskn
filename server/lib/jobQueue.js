@@ -1,11 +1,9 @@
 "use strict";
 /**
- * server/lib/jobQueue.js — Persistance JSON simple
+ * server/lib/jobQueue.js — Redis persistence (ou fallback fichier)
  *
- * - Zéro dépendance externe
- * - Sauvegarde dans jobs.json
- * - Survit aux redémarrages Railway
- * - Logs détaillés partout
+ * - Si REDIS_URL disponible → utilise Redis (persistant à 100%)
+ * - Sinon → fallback fichier local (perdu au redémarrage)
  */
 
 const fs = require("fs");
@@ -14,69 +12,109 @@ const { randomUUID } = require("crypto");
 
 const jobsFile = path.join(process.cwd(), "jobs.json");
 
-console.log(`[jobQueue] Initialisation — fichier: ${jobsFile}`);
+// ─── REDIS OPTIONNEL ──────────────────────────────────────────────────────────
+let redis = null;
 
-// ─── Charger jobs du fichier ────────────────────────────────────────────────
-function loadJobs() {
+if (process.env.REDIS_URL) {
+  try {
+    const Redis = require("redis");
+    redis = Redis.createClient({ url: process.env.REDIS_URL });
+    redis.on("error", (err) => console.warn(`⚠️  Redis error: ${err.message}`));
+    redis
+      .connect()
+      .then(() => {
+        console.log("✅ Redis connected — jobs vont persister");
+      })
+      .catch((err) => {
+        console.warn(
+          `⚠️  Redis connect failed: ${err.message} — fallback fichier`,
+        );
+        redis = null;
+      });
+  } catch (e) {
+    console.warn(`⚠️  Redis not available (${e.message}) — fallback fichier`);
+    redis = null;
+  }
+}
+
+// ─── FALLBACK FICHIER ─────────────────────────────────────────────────────────
+
+function loadJobsFile() {
   try {
     if (fs.existsSync(jobsFile)) {
       const data = fs.readFileSync(jobsFile, "utf8");
-      const jobs = JSON.parse(data || "{}");
-      console.log(
-        `[jobQueue] Chargé ${Object.keys(jobs).length} jobs depuis le fichier`,
-      );
-      return jobs;
+      return JSON.parse(data || "{}");
     }
   } catch (err) {
-    console.warn(
-      `[jobQueue] Erreur lecture fichier: ${err.message} — recommence vierge`,
-    );
+    console.warn(`⚠️  Erreur lecture fichier: ${err.message}`);
   }
   return {};
 }
 
-// ─── Sauvegarder jobs dans le fichier ────────────────────────────────────────
-function saveJobs(jobs) {
+function saveJobsFile(jobs) {
   try {
     fs.writeFileSync(jobsFile, JSON.stringify(jobs, null, 2), "utf8");
-    console.log(`[jobQueue] Sauvegardé ${Object.keys(jobs).length} jobs`);
   } catch (err) {
-    console.error(`[jobQueue] ERREUR SAUVEGARDE: ${err.message}`);
+    console.error(`❌ Erreur sauvegarde: ${err.message}`);
   }
 }
 
-// ─── Nettoyer les vieux jobs ────────────────────────────────────────────────
-function cleanOldJobs(jobs) {
-  const cutoff = Date.now() - 8 * 60 * 60 * 1000; // 8h
-  let deleted = 0;
-  for (const [id, job] of Object.entries(jobs)) {
-    if (job.createdAt < cutoff) {
-      delete jobs[id];
-      deleted++;
-    }
-  }
-  if (deleted > 0) {
-    console.log(`[jobQueue] Nettoyage: ${deleted} jobs supprimés`);
-    saveJobs(jobs);
-  }
-  return jobs;
-}
+// État global (fichier)
+let jobsMemory = loadJobsFile();
 
-// État global
-let jobs = loadJobs();
-jobs = cleanOldJobs(jobs);
-
-console.log(`[jobQueue] ✅ Prêt — ${Object.keys(jobs).length} jobs en attente`);
+console.log(
+  `[jobQueue] Initialisation — ${redis ? "Redis" : "fichier"} | ${Object.keys(jobsMemory).length} jobs existants`,
+);
 
 // ─── API ──────────────────────────────────────────────────────────────────────
+
+async function saveJob(jobId, job) {
+  if (redis) {
+    try {
+      await redis.set(`job:${jobId}`, JSON.stringify(job));
+    } catch (err) {
+      console.warn(`⚠️  Redis save failed: ${err.message}`);
+      jobsMemory[jobId] = job; // Fallback
+    }
+  } else {
+    jobsMemory[jobId] = job;
+    saveJobsFile(jobsMemory);
+  }
+}
+
+async function getJob(jobId) {
+  if (redis) {
+    try {
+      const data = await redis.get(`job:${jobId}`);
+      return data ? JSON.parse(data) : null;
+    } catch (err) {
+      console.warn(`⚠️  Redis get failed: ${err.message}`);
+      return jobsMemory[jobId] || null;
+    }
+  } else {
+    return jobsMemory[jobId] || null;
+  }
+}
+
+async function getAllJobsKeys() {
+  if (redis) {
+    try {
+      const keys = await redis.keys("job:*");
+      return keys.map((k) => k.replace("job:", ""));
+    } catch (err) {
+      console.warn(`⚠️  Redis keys failed: ${err.message}`);
+      return Object.keys(jobsMemory);
+    }
+  } else {
+    return Object.keys(jobsMemory);
+  }
+}
 
 /**
  * Crée un nouveau job.
  */
 function createJob() {
   const jobId = randomUUID();
-
-  console.log(`\n[createJob] CRÉATION job: ${jobId}`);
 
   const ts = () =>
     new Date().toLocaleTimeString("fr-FR", {
@@ -95,45 +133,42 @@ function createJob() {
   };
 
   // Sauvegarder immédiatement
-  jobs[jobId] = job;
-  saveJobs(jobs);
-
+  saveJob(jobId, job);
   console.log(`[createJob] Job créé et SAUVEGARDÉ: ${jobId}`);
-  console.log(`[createJob] Total jobs en fichier: ${Object.keys(jobs).length}`);
 
   return {
     jobId,
 
-    log(msg, type = "info") {
+    async log(msg, type = "info") {
       const logEntry = { ts: ts(), msg, type };
-      const j = jobs[jobId];
+      const j = await getJob(jobId);
       if (j) {
         j.logs.push(logEntry);
-        saveJobs(jobs); // Sauvegarder après chaque log
+        await saveJob(jobId, j);
       }
       console.log(`[${jobId}] ${msg}`);
     },
 
-    done(data) {
-      const j = jobs[jobId];
+    async done(data) {
+      const j = await getJob(jobId);
       if (j) {
         j.status = "done";
         j.result = data;
-        saveJobs(jobs);
+        await saveJob(jobId, j);
       }
-      console.log(`[${jobId}] ✅ DONE — sauvegardé`);
+      console.log(`[${jobId}] ✅ DONE`);
     },
 
-    fail(err) {
+    async fail(err) {
       const errMsg = err?.message || String(err);
-      const j = jobs[jobId];
+      const j = await getJob(jobId);
       if (j) {
         j.status = "error";
         j.error = errMsg;
         j.logs.push({ ts: ts(), msg: `❌ ${errMsg}`, type: "error" });
-        saveJobs(jobs);
+        await saveJob(jobId, j);
       }
-      console.log(`[${jobId}] ❌ FAIL — ${errMsg} — sauvegardé`);
+      console.log(`[${jobId}] ❌ FAIL — ${errMsg}`);
     },
   };
 }
@@ -141,21 +176,20 @@ function createJob() {
 /**
  * Retourne l'état d'un job.
  */
-function getJobStatus(jobId, cursor = 0) {
-  console.log(
-    `[getJobStatus] Demande: ${jobId} | Jobs existants: ${Object.keys(jobs).join(", ")}`,
-  );
-
-  const job = jobs[jobId];
+async function getJobStatus(jobId, cursor = 0) {
+  const job = await getJob(jobId);
 
   if (!job) {
-    console.log(`[getJobStatus] NOT FOUND: ${jobId}`);
+    const keys = await getAllJobsKeys();
+    console.log(
+      `[getJobStatus] NOT FOUND: ${jobId} | jobs existants: ${keys.join(", ")}`,
+    );
     return { found: false };
   }
 
   const newLogs = job.logs.slice(cursor);
   console.log(
-    `[getJobStatus] FOUND: ${jobId} | statut: ${job.status} | nouveaux logs: ${newLogs.length}`,
+    `[getJobStatus] FOUND: ${jobId} | ${job.status} | ${newLogs.length} nouveaux logs`,
   );
 
   return {
@@ -169,14 +203,17 @@ function getJobStatus(jobId, cursor = 0) {
 }
 
 /**
- * Retourne tous les jobs (pour debug).
+ * Retourne tous les jobs (debug).
  */
-function getAllJobs() {
-  return Object.values(jobs).map((j) => ({
-    id: j.id,
-    status: j.status,
-    logsCount: j.logs.length,
-  }));
+async function getAllJobs() {
+  const keys = await getAllJobsKeys();
+  const jobs = [];
+  for (const key of keys) {
+    const job = await getJob(key);
+    if (job)
+      jobs.push({ id: job.id, status: job.status, logsCount: job.logs.length });
+  }
+  return jobs;
 }
 
 module.exports = { createJob, getJobStatus, getAllJobs };
