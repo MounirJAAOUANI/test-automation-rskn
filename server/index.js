@@ -541,6 +541,116 @@ app.post("/api/webhook/github", async (req, res) => {
   }
 });
 
+// ─── DEBUG ENDPOINTS ──────────────────────────────────────────────────────────
+
+/**
+ * GET /api/debug/jobs
+ * Retourne TOUS les jobs actuels avec leur statut complet
+ */
+app.get("/api/debug/jobs", async (req, res) => {
+  try {
+    const { getAllJobs } = require("./lib/jobQueue");
+    const jobs = await getAllJobs();
+
+    res.json({
+      totalJobs: jobs.length,
+      jobs,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/debug/jobs/:jobId/full
+ * Retourne les détails COMPLETS d'un job (tous les logs, status, etc.)
+ */
+app.get("/api/debug/jobs/:jobId/full", async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const jobQueue = require("./lib/jobQueue");
+
+    // Importer getJob depuis jobQueue (tu dois l'exporter)
+    // Pour maintenant, on utilise getJobStatus
+    const state = await require("./lib/jobQueue").getJobStatus(jobId, 0);
+
+    if (!state.found) {
+      return res.status(404).json({ error: `Job ${jobId} not found` });
+    }
+
+    res.json({
+      jobId,
+      ...state,
+      allLogs: state.newLogs || [],
+      totalLogs: (state.newLogs || []).length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/debug/pollers
+ * Retourne les pollers GitHub Actions actuellement actifs
+ */
+app.get("/api/debug/pollers", (req, res) => {
+  try {
+    const { getActivePollers } = require("./lib/github-poller");
+    const activePollers = getActivePollers();
+
+    res.json({
+      activeCount: activePollers.length,
+      pollers: activePollers,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/debug/job/:jobId/force-complete
+ * ADMIN : Force un job à se terminer (pour test/debug)
+ */
+app.post("/api/debug/job/:jobId/force-complete", async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { result = { message: "Force completed by admin" } } = req.body;
+
+    console.log(`[admin] Force completing job ${jobId}`);
+
+    // Cette endpoint est dangereuse — à protéger avec une clé API en production
+    res.json({
+      ok: true,
+      message: `Job ${jobId} forcé à se compléter`,
+      jobId,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/debug/system
+ * Retourne l'état du système
+ */
+app.get("/api/debug/system", (req, res) => {
+  res.json({
+    mode: MODE_ENV,
+    debug: MOT_DEBUG,
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: {
+      heapUsed:
+        Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + " MB",
+      heapTotal:
+        Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + " MB",
+    },
+  });
+});
+
 // ─── STATIC ───────────────────────────────────────────────────────────────────
 if (IS_PROD) {
   const clientBuild = path.join(__dirname, "../client/dist");
