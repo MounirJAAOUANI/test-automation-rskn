@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App Factory — Debug Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #60a5fa;
+      margin-bottom: 20px;
+      font-size: 24px;
+    }
+    h2 {
+      color: #818cf8;
+      margin-top: 30px;
+      margin-bottom: 15px;
+      font-size: 18px;
+      border-bottom: 2px solid #818cf8;
+      padding-bottom: 10px;
+    }
+    .section {
+      background: #1e293b;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      border-left: 4px solid #818cf8;
+    }
+    .status-box {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .status-card {
+      background: #0f172a;
+      padding: 15px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+    }
+    .status-card.success { border-left: 4px solid #10b981; }
+    .status-card.error { border-left: 4px solid #ef4444; }
+    .status-card.warning { border-left: 4px solid #f59e0b; }
+    .status-card.info { border-left: 4px solid #3b82f6; }
+    
+    .label {
+      color: #94a3b8;
+      font-size: 12px;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+    .value {
+      color: #e2e8f0;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    
+    .job-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .job-item {
+      background: #0f172a;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #818cf8;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 15px;
+      align-items: start;
+    }
+    .job-item.running { border-left-color: #f59e0b; }
+    .job-item.done { border-left-color: #10b981; }
+    .job-item.error { border-left-color: #ef4444; }
+    
+    .job-id {
+      font-family: 'Courier New';
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 5px;
+    }
+    .job-status {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .job-status.running { background: #f59e0b; color: #1e293b; }
+    .job-status.done { background: #10b981; color: white; }
+    .job-status.error { background: #ef4444; color: white; }
+    
+    .job-logs {
+      font-size: 12px;
+      color: #cbd5e1;
+      margin-top: 8px;
+      max-height: 150px;
+      overflow-y: auto;
+      background: #1e293b;
+      padding: 8px;
+      border-radius: 4px;
+    }
+    .log-line { margin: 4px 0; }
+    .log-line.info { color: #60a5fa; }
+    .log-line.success { color: #10b981; }
+    .log-line.error { color: #ef4444; }
+    .log-line.warn { color: #f59e0b; }
+    
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    button.danger {
+      background: #ef4444;
+    }
+    button.danger:hover {
+      background: #dc2626;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .timestamp {
+      color: #64748b;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔧 App Factory Debug Dashboard</h1>
+    
+    <div class="controls">
+      <button onclick="refreshAll()">🔄 Refresh All</button>
+      <button onclick="clearAllData()">🗑️ Clear Data</button>
+    </div>
+
+    <div class="section">
+      <h2>System Status</h2>
+      <div id="systemStatus" class="status-box">
+        <div class="status-card">
+          <div class="label">Mode</div>
+          <div class="value" id="sysMode">—</div>
+        </div>
+        <div class="status-card">
+          <div class="label">Uptime</div>
+          <div class="value" id="sysUptime">—</div>
+        </div>
+        <div class="status-card">
+          <div class="label">Memory</div>
+          <div class="value" id="sysMemory">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Active GitHub Pollers</h2>
+      <div id="pollerStatus" class="status-box">
+        <div class="status-card">
+          <div class="label">Active Pollers</div>
+          <div class="value" id="pollerCount">—</div>
+        </div>
+      </div>
+      <div id="pollerList"></div>
+    </div>
+
+    <div class="section">
+      <h2>Jobs Status</h2>
+      <div id="jobsStatus" class="status-box">
+        <div class="status-card">
+          <div class="label">Total Jobs</div>
+          <div class="value" id="jobsTotal">—</div>
+        </div>
+        <div class="status-card">
+          <div class="label">Running</div>
+          <div class="value" id="jobsRunning">—</div>
+        </div>
+        <div class="status-card">
+          <div class="label">Done</div>
+          <div class="value" id="jobsDone">—</div>
+        </div>
+      </div>
+      <div class="job-list" id="jobsList"></div>
+      <div class="timestamp" id="lastUpdate"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "https://test-automation-rskn-production.up.railway.app/api";
+
+    async function fetchSystem() {
+      try {
+        const res = await fetch(`${API_URL}/debug/system`);
+        const data = await res.json();
+        document.getElementById("sysMode").textContent = data.mode;
+        document.getElementById("sysUptime").textContent = Math.floor(data.uptime) + "s";
+        document.getElementById("sysMemory").textContent = data.memory.heapUsed + " / " + data.memory.heapTotal;
+      } catch (e) {
+        console.error("System fetch failed:", e);
+      }
+    }
+
+    async function fetchPollers() {
+      try {
+        const res = await fetch(`${API_URL}/debug/pollers`);
+        const data = await res.json();
+        document.getElementById("pollerCount").textContent = data.activeCount;
+        
+        const list = document.getElementById("pollerList");
+        if (data.activeCount === 0) {
+          list.innerHTML = "<p style='color: #94a3b8;'>Aucun poller actif</p>";
+        } else {
+          list.innerHTML = data.pollers.map(p => 
+            `<div class="job-item running"><div>🔄 Polling ${p}</div></div>`
+          ).join("");
+        }
+      } catch (e) {
+        console.error("Pollers fetch failed:", e);
+      }
+    }
+
+    async function fetchJobs() {
+      try {
+        const res = await fetch(`${API_URL}/debug/jobs`);
+        const data = await res.json();
+        
+        document.getElementById("jobsTotal").textContent = data.totalJobs;
+        
+        const running = data.jobs.filter(j => j.status === "running").length;
+        const done = data.jobs.filter(j => j.status === "done").length;
+        
+        document.getElementById("jobsRunning").textContent = running;
+        document.getElementById("jobsDone").textContent = done;
+        
+        const list = document.getElementById("jobsList");
+        if (data.totalJobs === 0) {
+          list.innerHTML = "<p style='color: #94a3b8;'>Aucun job</p>";
+        } else {
+          list.innerHTML = await Promise.all(data.jobs.map(async j => {
+            const fullRes = await fetch(`${API_URL}/debug/jobs/${j.id}/full`);
+            const full = await fullRes.json();
+            
+            const logsHtml = (full.newLogs || [])
+              .slice(-5)  // Last 5 logs only
+              .map(log => `<div class="log-line ${log.type}">${log.msg}</div>`)
+              .join("");
+            
+            return `
+              <div class="job-item ${j.status}">
+                <div>
+                  <div class="job-id">${j.id}</div>
+                  <div class="job-status ${j.status}">${j.status}</div>
+                  <div class="job-logs">${logsHtml || "<em>No logs yet</em>"}</div>
+                </div>
+              </div>
+            `;
+          })).then(items => items.join(""));
+        }
+        
+        document.getElementById("lastUpdate").textContent = "Updated: " + new Date().toLocaleTimeString("fr-FR");
+      } catch (e) {
+        console.error("Jobs fetch failed:", e);
+      }
+    }
+
+    async function refreshAll() {
+      console.log("Refreshing all...");
+      await Promise.all([fetchSystem(), fetchPollers(), fetchJobs()]);
+    }
+
+    function clearAllData() {
+      if (confirm("⚠️ Clear all data?")) {
+        localStorage.clear();
+        console.log("Cleared");
+      }
+    }
+
+    // Auto-refresh every 10 seconds
+    refreshAll();
+    setInterval(refreshAll, 10000);
+  </script>
+</body>
+</html>
