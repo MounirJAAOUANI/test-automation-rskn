@@ -651,6 +651,8 @@ app.get("/api/debug/system", (req, res) => {
   });
 });
 
+app.use(express.static(path.join(__dirname, "public")));
+
 // ─── STATIC ───────────────────────────────────────────────────────────────────
 if (IS_PROD) {
   const clientBuild = path.join(__dirname, "../client/dist");
