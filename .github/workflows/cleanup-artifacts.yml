@@ -1,0 +1,18 @@
+name: Cleanup Old Artifacts
+
+on:
+  schedule:
+    # Tous les jours à 2h du matin
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete artifacts older than 1 day
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: |
+            app-release-aab
+            app-debug-apk

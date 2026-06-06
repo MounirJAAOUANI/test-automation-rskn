@@ -224,7 +224,7 @@ jobs:
         with:
           name: app-release-aab
           path: build/app/outputs/bundle/release/app-release.aab
-          retention-days: 30
+          retention-days: 1
 
       # ── 14. Upload APK debug ──────────────────────────────────────────────
       - name: Upload APK debug artifact
@@ -232,7 +232,7 @@ jobs:
         with:
           name: app-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 30
+          retention-days: 1
 
       # ── 15. Résumé ────────────────────────────────────────────────────────
       - name: Build summary
