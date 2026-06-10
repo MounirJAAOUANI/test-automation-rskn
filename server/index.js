@@ -632,6 +632,87 @@ app.post("/api/debug/job/:jobId/force-complete", async (req, res) => {
   }
 });
 
+app.get("/api/debug/jobs/all-detailed", async (req, res) => {
+  try {
+    const jobQueue = require("./lib/jobQueue");
+    const allJobs = await jobQueue.getAllJobs();
+
+    // Pour chaque job, on fait un appel complet
+    const detailed = await Promise.all(
+      allJobs.map(async (job) => {
+        const state = await jobQueue.getJobStatus(job.id, 0);
+        return {
+          id: job.id,
+          status: job.status,
+          logsCount: job.logsCount,
+          allLogs: state.newLogs || [],
+          found: state.found,
+          error: state.error,
+          result: state.result,
+        };
+      }),
+    );
+
+    const running = detailed.filter((j) => j.status === "running").length;
+    const done = detailed.filter((j) => j.status === "done").length;
+    const error = detailed.filter((j) => j.status === "error").length;
+
+    res.json({
+      summary: {
+        total: detailed.length,
+        running,
+        done,
+        error,
+      },
+      jobs: detailed,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+/**
+ * GET /api/debug/webhook-test
+ * Teste le webhook en simulant un appel GitHub
+ */
+app.get("/api/debug/webhook-test", async (req, res) => {
+  const testPayload = {
+    action: "completed",
+    workflow_run: {
+      id: 999999999,
+      conclusion: "success",
+      html_url: "https://github.com/test/actions/runs/999999999",
+    },
+  };
+
+  console.log("[webhook-test] Envoi test payload:", testPayload);
+
+  try {
+    // Appeler nous-mêmes le webhook
+    const response = await fetch(
+      `http://localhost:${PORT}/api/webhook/github`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(testPayload),
+      },
+    );
+
+    const result = await response.json();
+    res.json({
+      ok: true,
+      message: "Test webhook envoyé",
+      response: result,
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Webhook test failed",
+      details: err.message,
+    });
+  }
+});
+
 /**
  * GET /api/debug/system
  * Retourne l'état du système

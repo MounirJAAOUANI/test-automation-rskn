@@ -1,6 +1,11 @@
 "use strict";
 /**
- * server/lib/jobQueue.js — FINAL avec reprise des pollers GitHub
+ * server/lib/jobQueue.js — FIXED
+ *
+ * FIXES:
+ * 1. setWorkflowRunId() relance immédiatement le poller GitHub
+ * 2. initRedis() relance les pollers avec callbacks corrects
+ * 3. Tous les callbacks de poller mettent à jour le job correctement
  */
 
 const fs = require("fs");
@@ -24,7 +29,7 @@ async function initRedis() {
       await redis.connect();
       console.log("✅ Redis connected");
 
-      // ── FIX STRUCTUREL : Reprendre les jobs `running` ──
+      // ── Reprendre les jobs `running` après redémarrage ──
       const jobKeys = await redis.keys("job:*");
       console.log(
         `[jobQueue] Scanning ${jobKeys.length} jobs après redémarrage...`,
@@ -39,19 +44,34 @@ async function initRedis() {
               `[jobQueue] 🔄 Reprise surveillance: ${job.id} (run ${job.workflowRunId})`,
             );
 
-            // Relancer le poller GitHub
+            // ── RELANCER LE POLLER avec callback correct ──
             startGitHubPoller(
               job.id,
               job.workflowRunId,
+              // onLog callback
+              async (msg, type = "info") => {
+                const j = await getJob(job.id);
+                if (j) {
+                  j.logs.push({
+                    ts: new Date().toLocaleTimeString("fr-FR"),
+                    msg,
+                    type,
+                  });
+                  await saveJob(job.id, j);
+                }
+                console.log(`[${job.id}] ${msg}`);
+              },
+              // onStatusChange callback — TRÈS IMPORTANT
               async (status, data) => {
-                // Callback quand le run est terminé
+                console.log(`[poller] Job ${job.id} → status: ${status}`);
+
                 if (status === "completed") {
                   const j = await getJob(job.id);
                   if (j) {
                     j.status = "done";
                     j.result = data;
                     await saveJob(job.id, j);
-                    console.log(`[jobQueue] Job ${job.id} marqué DONE`);
+                    console.log(`[jobQueue] ✅ Job ${job.id} marqué DONE`);
                   }
                 } else if (status === "failure") {
                   const j = await getJob(job.id);
@@ -59,7 +79,15 @@ async function initRedis() {
                     j.status = "error";
                     j.error = "GitHub Actions build failed";
                     await saveJob(job.id, j);
-                    console.log(`[jobQueue] Job ${job.id} marqué ERROR`);
+                    console.log(`[jobQueue] ❌ Job ${job.id} marqué ERROR`);
+                  }
+                } else if (status === "timeout") {
+                  const j = await getJob(job.id);
+                  if (j) {
+                    j.status = "error";
+                    j.error = "Build timeout (> 15 min)";
+                    await saveJob(job.id, j);
+                    console.log(`[jobQueue] ⏱️ Job ${job.id} timeout`);
                   }
                 }
               },
@@ -166,7 +194,7 @@ function createJob() {
     logs: [],
     result: null,
     error: null,
-    workflowRunId: null, // ← IMPORTANT : pour relancer après redémarrage
+    workflowRunId: null,
     createdAt: Date.now(),
   };
 
@@ -191,6 +219,55 @@ function createJob() {
       if (j) {
         j.workflowRunId = runId;
         await saveJob(jobId, j);
+
+        // ✅ FIX A: RELANCER IMMÉDIATEMENT LE POLLER
+        console.log(
+          `[setWorkflowRunId] Lancement poller pour job ${jobId} (run ${runId})`,
+        );
+
+        startGitHubPoller(
+          jobId,
+          runId,
+          // onLog callback
+          async (msg, type = "info") => {
+            const job = await getJob(jobId);
+            if (job) {
+              job.logs.push({ ts: ts(), msg, type });
+              await saveJob(jobId, job);
+            }
+            console.log(`[${jobId}] ${msg}`);
+          },
+          // onStatusChange callback ✅ TRÈS IMPORTANT
+          async (status, data) => {
+            console.log(`[poller] Job ${jobId} → status: ${status}`);
+
+            if (status === "completed") {
+              const job = await getJob(jobId);
+              if (job) {
+                job.status = "done";
+                job.result = data;
+                await saveJob(jobId, job);
+                console.log(`[jobQueue] ✅ Job ${jobId} marqué DONE`);
+              }
+            } else if (status === "failure") {
+              const job = await getJob(jobId);
+              if (job) {
+                job.status = "error";
+                job.error = "GitHub Actions build failed";
+                await saveJob(jobId, job);
+                console.log(`[jobQueue] ❌ Job ${jobId} marqué ERROR`);
+              }
+            } else if (status === "timeout") {
+              const job = await getJob(jobId);
+              if (job) {
+                job.status = "error";
+                job.error = "Build timeout (> 15 min)";
+                await saveJob(jobId, job);
+                console.log(`[jobQueue] ⏱️ Job ${jobId} timeout`);
+              }
+            }
+          },
+        );
       }
     },
 
