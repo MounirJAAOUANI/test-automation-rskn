@@ -1057,10 +1057,10 @@ app.post("/api/webhook/playstore", async (req, res) => {
   }
 
   console.log(
-    `\n[playstore-webhook] DRAFT MODE: Publishing ${appName} (${packageId})`,
+    `\n[playstore-webhook] Publishing ${appName} (${packageId}) to internal testing`,
   );
   console.log(
-    `[playstore-webhook] ⚠️  This will create a DRAFT only, not submit for review\n`,
+    `[playstore-webhook] ✅ This will publish the build to the internal track in Play Console\n`,
   );
 
   try {
@@ -1131,9 +1131,11 @@ app.post("/api/webhook/playstore", async (req, res) => {
       `[playstore-webhook] ✅ Upload successful: versionCode ${uploadResult.versionCode}`,
     );
     console.log(
-      `[playstore-webhook] 📝 DRAFT created - Review in Play Console`,
+      `[playstore-webhook] ✅ Published to internal testing - review in Play Console`,
     );
-    console.log(`[playstore-webhook] 🔗 ${uploadResult.draftUrl}\n`);
+    console.log(
+      `[playstore-webhook] 🔗 ${uploadResult.url || uploadResult.releaseUrl}\n`,
+    );
 
     // Stocker le résultat dans Firebase
     const db = require("firebase-admin").database();
@@ -1142,20 +1144,20 @@ app.post("/api/webhook/playstore", async (req, res) => {
     await buildRef.update({
       playstore_version_code: uploadResult.versionCode,
       playstore_edit_id: uploadResult.editId,
-      playstore_status: "draft_created", // ← NEW: Draft only
+      playstore_status: "published_internal",
       playstore_timestamp: new Date().toISOString(),
-      playstore_url: uploadResult.draftUrl,
+      playstore_url: uploadResult.url || uploadResult.releaseUrl,
       playstore_message:
-        "⚠️ Draft created. Review in Play Console before submitting.",
+        "✅ Internal testing release published. Vérifiez Play Console.",
     });
 
     res.json({
       ok: true,
       versionCode: uploadResult.versionCode,
       editId: uploadResult.editId,
-      status: "draft_created",
-      message: `📝 Draft created (versionCode ${uploadResult.versionCode}). Review in Play Console before submitting.`,
-      playConsoleUrl: uploadResult.draftUrl,
+      status: "published_internal",
+      message: `✅ Internal testing release published (versionCode ${uploadResult.versionCode}).`,
+      playConsoleUrl: uploadResult.url || uploadResult.releaseUrl,
     });
   } catch (err) {
     console.error(`[playstore-webhook] Error: ${err.message}`);

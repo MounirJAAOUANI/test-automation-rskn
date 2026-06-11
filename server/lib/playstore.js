@@ -53,7 +53,12 @@ function mockData(niche) {
  * @param {Buffer} aabBuffer - AAB file content
  * @param {string|object} credentialsJson - JSON string or object from GOOGLE_PLAY_CREDENTIALS / GOOGLE_PLAY_SERVICE_ACCOUNT
  */
-async function uploadAABToPlayConsole(packageId, aabBuffer, credentialsJson) {
+async function uploadAABToPlayConsole(
+  packageId,
+  aabBuffer,
+  credentialsJson,
+  options = {},
+) {
   try {
     console.log(`[uploadAABToPlayConsole] Démarrage upload pour ${packageId}`);
 
@@ -136,12 +141,13 @@ async function uploadAABToPlayConsole(packageId, aabBuffer, credentialsJson) {
       `[uploadAABToPlayConsole] Uploading ${(aabBuffer.length / 1024 / 1024).toFixed(1)} MB...`,
     );
 
+    const { Readable } = require("stream");
     const uploadResponse = await androidpublisher.edits.bundles.upload({
       packageName: packageId,
       editId,
       media: {
         mimeType: "application/octet-stream",
-        body: aabBuffer,
+        body: Readable.from(aabBuffer),
       },
     });
 
@@ -151,15 +157,18 @@ async function uploadAABToPlayConsole(packageId, aabBuffer, credentialsJson) {
     }
     console.log(`✅ AAB uploadé avec succès: versionCode ${versionCode}`);
 
-    // ── 5. Mettre la track interne en brouillon ──
+    const trackName = options.trackName || "internal";
+    const trackStatus = options.trackStatus || "completed";
+
+    // ── 5. Mettre la track interne en publication réelle ──
     await androidpublisher.edits.tracks.update({
       packageName: packageId,
       editId,
-      track: "internal",
+      track: trackName,
       requestBody: {
         releases: [
           {
-            status: "draft",
+            status: trackStatus,
             versionCodes: [versionCode],
           },
         ],
@@ -170,19 +179,20 @@ async function uploadAABToPlayConsole(packageId, aabBuffer, credentialsJson) {
     const commitResponse = await androidpublisher.edits.commit({
       packageName: packageId,
       editId,
-      changesNotSentForReview: false,
     });
 
-    const draftUrl = `https://play.google.com/console/u/0/developers/123456/app/${packageId}/internal-testing`; // renseigné à titre indicatif
+    const releaseUrl = `https://play.google.com/console/u/0/developers/123456/app/${packageId}/internal-testing`;
 
     return {
       success: true,
       versionCode,
       editId,
       size: aabBuffer.length,
-      message: `AAB uploadé à Play Console (versionCode: ${versionCode})`,
-      url: draftUrl,
-      draftUrl,
+      trackName,
+      trackStatus,
+      message: `AAB uploadé à Play Console (versionCode: ${versionCode}, track: ${trackName}, status: ${trackStatus})`,
+      url: releaseUrl,
+      releaseUrl,
     };
   } catch (err) {
     console.error(`❌ Play Console upload error: ${err.message}`);
