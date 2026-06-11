@@ -127,10 +127,8 @@ export async function executeStep(stepId, onLog, outputs) {
       return { success: false, error: { msg: `HTTP ${response.status}` } };
     }
 
-    const data = await response.json();
-
-    // Pour les steps avec polling (SSE): build-deploy
     if (stepId === "build-deploy") {
+      const data = await response.json();
       if (!data.jobId) {
         return { success: false, error: { msg: "No jobId returned" } };
       }
@@ -160,48 +158,43 @@ export async function executeStep(stepId, onLog, outputs) {
       });
     }
 
-    // SSE pour autres steps: utiliser fetch avec streaming
-    return new Promise(async (resolve) => {
-      try {
-        const sseResponse = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
 
-        const reader = sseResponse.body.getReader();
-        const decoder = new TextDecoder();
+    return new Promise((resolve) => {
+      (async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split("\n");
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
-
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const msg = JSON.parse(line.slice(6));
-                if (msg.event === "log") {
-                  onLog?.(msg);
-                } else if (msg.event === "done") {
-                  resolve({ success: true, data: msg.data });
-                  return;
-                } else if (msg.event === "error") {
-                  resolve({ success: false, error: msg });
-                  return;
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                try {
+                  const msg = JSON.parse(line.slice(6));
+                  if (msg.event === "log") {
+                    onLog?.(msg);
+                  } else if (msg.event === "done") {
+                    resolve({ success: true, data: msg.data });
+                    return;
+                  } else if (msg.event === "error") {
+                    resolve({ success: false, error: msg });
+                    return;
+                  }
+                } catch (e) {
+                  // Ignorer les lignes mal formées
                 }
-              } catch (e) {
-                // Ignorer les lignes mal formées
               }
             }
           }
+          resolve({ success: false, error: { msg: "Stream ended unexpectedly" } });
+        } catch (err) {
+          resolve({ success: false, error: err });
         }
-        resolve({ success: false, error: { msg: "Stream ended unexpectedly" } });
-      } catch (err) {
-        resolve({ success: false, error: err });
-      }
+      })();
     });
   } catch (err) {
     return { success: false, error: err };

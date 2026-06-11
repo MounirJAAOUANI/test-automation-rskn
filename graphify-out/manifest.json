@@ -50,8 +50,8 @@
     "semantic_hash": "b892d5f1acfa3e95b4ead465c885fa65"
   },
   "client/src/steps/index.js": {
-    "mtime": 1781212482.2532356,
-    "ast_hash": "9d83a613a58c8ab0d5c1dee497ac5451",
+    "mtime": 1781213115.8582785,
+    "ast_hash": "7892539b2d8f32fbdadf6890a34377ad",
     "semantic_hash": ""
   },
   "client/vite.config.js": {
@@ -487,6 +487,11 @@
   "policies/com-appfactory-spendsmart-privacy.html": {
     "mtime": 1781211128.3232157,
     "ast_hash": "fdab5ec7f0ccc0db8b1284bea0497572",
+    "semantic_hash": ""
+  },
+  "policies/com-appfactory-habitus-privacy.html": {
+    "mtime": 1781212544.2310615,
+    "ast_hash": "66aa59e392aa0945d06fdbccb798b61e",
     "semantic_hash": ""
   }
 }
