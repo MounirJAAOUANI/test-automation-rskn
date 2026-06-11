@@ -10,9 +10,9 @@
     "semantic_hash": "33899054464aa2f2570e159cc399328c"
   },
   "client/src/App.jsx": {
-    "mtime": 1781175669.0929103,
-    "ast_hash": "266d29b5b8cd68682832e166bd98b228",
-    "semantic_hash": "266d29b5b8cd68682832e166bd98b228"
+    "mtime": 1781213416.8005025,
+    "ast_hash": "b1560a0e96e37a985cadb8458c99d4f7",
+    "semantic_hash": ""
   },
   "client/src/api.js": {
     "mtime": 1780518609.1211674,
@@ -50,9 +50,9 @@
     "semantic_hash": "b892d5f1acfa3e95b4ead465c885fa65"
   },
   "client/src/steps/index.js": {
-    "mtime": 1780067352.463657,
-    "ast_hash": "3c4e87d0e3588d8877304e145b7ffc0a",
-    "semantic_hash": "3c4e87d0e3588d8877304e145b7ffc0a"
+    "mtime": 1781213416.8005025,
+    "ast_hash": "854de73e6741ee970e95193456312e1b",
+    "semantic_hash": ""
   },
   "client/vite.config.js": {
     "mtime": 1780067352.4726,
@@ -75,7 +75,7 @@
     "semantic_hash": "8fce626d4a69316d88c7adb90e05f4c2"
   },
   "server/index.js": {
-    "mtime": 1781210515.000779,
+    "mtime": 1781213739.0598116,
     "ast_hash": "fe3f90927b2c13088a9a6095ad105377",
     "semantic_hash": ""
   },
@@ -85,9 +85,9 @@
     "semantic_hash": "e77e43b4631b0f4f07cd2a3d52566d43"
   },
   "server/lib/firebase.js": {
-    "mtime": 1780267165.237879,
-    "ast_hash": "9ed71da2593432efd98b59623b451a5a",
-    "semantic_hash": "9ed71da2593432efd98b59623b451a5a"
+    "mtime": 1781213416.8060153,
+    "ast_hash": "4b859a82854907297a252bae3b4348a3",
+    "semantic_hash": ""
   },
   "server/lib/github-poller.js": {
     "mtime": 1780519052.1714468,
@@ -110,8 +110,8 @@
     "semantic_hash": "4085a2420cb02cd6887d13a2da18c150"
   },
   "server/lib/playstore.js": {
-    "mtime": 1781210515.0059414,
-    "ast_hash": "551eb783eeb16d5000ab2f18970bb317",
+    "mtime": 1781213791.0725315,
+    "ast_hash": "fd6e6c3c072e1b9fb1264c35004f3493",
     "semantic_hash": ""
   },
   "server/lib/privacypolicy.js": {
@@ -145,7 +145,7 @@
     "semantic_hash": "1893e48fbf6c8216b3c55f71c31282d0"
   },
   ".github/workflows/build.yml": {
-    "mtime": 1781201517.7919793,
+    "mtime": 1781213739.0119393,
     "ast_hash": "b1be218d8755301698fb70ed2a0b0eec",
     "semantic_hash": "b1be218d8755301698fb70ed2a0b0eec"
   },
@@ -315,7 +315,7 @@
     "semantic_hash": "0ba9c5de11052685cd000de2308b36cc"
   },
   "policies/com-appfactory-savingquest-privacy.html": {
-    "mtime": 1781178265.703539,
+    "mtime": 1781213739.044279,
     "ast_hash": "0eea154a5bd70ae3ece1e12424fbe6c0",
     "semantic_hash": "0eea154a5bd70ae3ece1e12424fbe6c0"
   },
@@ -355,7 +355,7 @@
     "semantic_hash": "8cdfb1033f1c8ab8a93536c207fce7fd"
   },
   "policies/com-appfactory-spendless-privacy.html": {
-    "mtime": 1781176423.6402073,
+    "mtime": 1781213739.054623,
     "ast_hash": "c50a1ce6275bdf278777a0be2a2a0044",
     "semantic_hash": "c50a1ce6275bdf278777a0be2a2a0044"
   },
@@ -470,18 +470,23 @@
     "semantic_hash": "3b4fcfcf393eca4d264dca4a4663bc37"
   },
   "policies/com-appfactory-freebudget-privacy.html": {
-    "mtime": 1781206762.492005,
+    "mtime": 1781213739.035882,
     "ast_hash": "9c2d76a243ca755360d560bb1ca22476",
     "semantic_hash": ""
   },
   "policies/com-appfactory-receiptmind-privacy.html": {
-    "mtime": 1781210292.5884662,
+    "mtime": 1781213739.035882,
     "ast_hash": "3b6ae5dfb78b34d4bcaea56e133e61e0",
     "semantic_hash": ""
   },
   "policies/com-appfactory-thrift-privacy.html": {
-    "mtime": 1781206762.5152984,
+    "mtime": 1781213739.054623,
     "ast_hash": "384d060b7ad3adfc0e65766bfefde1a2",
+    "semantic_hash": ""
+  },
+  "policies/com-appfactory-spendsmart-privacy.html": {
+    "mtime": 1781213739.054623,
+    "ast_hash": "fdab5ec7f0ccc0db8b1284bea0497572",
     "semantic_hash": ""
   }
 }
