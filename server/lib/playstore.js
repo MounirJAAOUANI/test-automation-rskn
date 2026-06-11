@@ -181,7 +181,7 @@ async function uploadAABToPlayConsole(
       editId,
     });
 
-    const releaseUrl = `https://play.google.com/console/u/0/developers/123456/app/${packageId}/internal-testing`;
+    const releaseUrl = `https://play.google.com/console/apps/details?id=${packageId}`;
 
     return {
       success: true,
@@ -232,7 +232,7 @@ async function submitAppForReview(
     });
 
     // Créer un edit
-    const editResponse = await androidpublisher.edits.create({
+    const editResponse = await androidpublisher.edits.insert({
       packageName: packageId,
     });
 
