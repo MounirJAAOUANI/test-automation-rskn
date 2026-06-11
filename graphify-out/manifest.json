@@ -110,8 +110,8 @@
     "semantic_hash": "4085a2420cb02cd6887d13a2da18c150"
   },
   "server/lib/playstore.js": {
-    "mtime": 1781211178.9117126,
-    "ast_hash": "dd9c3e9a62d0f98c0ff267df45d27e18",
+    "mtime": 1781210515.0059414,
+    "ast_hash": "551eb783eeb16d5000ab2f18970bb317",
     "semantic_hash": ""
   },
   "server/lib/privacypolicy.js": {
@@ -482,11 +482,6 @@
   "policies/com-appfactory-thrift-privacy.html": {
     "mtime": 1781206762.5152984,
     "ast_hash": "384d060b7ad3adfc0e65766bfefde1a2",
-    "semantic_hash": ""
-  },
-  "policies/com-appfactory-spendsmart-privacy.html": {
-    "mtime": 1781211128.3232157,
-    "ast_hash": "fdab5ec7f0ccc0db8b1284bea0497572",
     "semantic_hash": ""
   }
 }
