@@ -2,17 +2,38 @@ name: Cleanup Old Artifacts
 
 on:
   schedule:
-    # Tous les jours à 2h du matin
-    - cron: "0 1 * * *"
+    # Tous les jours à 2h du matin UTC
+    - cron: "0 2 * * *"
   workflow_dispatch:
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - name: Delete artifacts older than 1 day
-        uses: geekyeggo/delete-artifact@v2
-        with:
-          name: |
-            app-release-aab
-            app-debug-apk
+      - name: Clean up all artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🗑️ Cleaning up artifacts..."
+
+          # Lister tous les artifacts
+          ARTIFACTS=$(gh api repos/${{ github.repository }}/actions/artifacts --paginate -q '.artifacts[] | select(.name == "app-release-aab" or .name == "app-debug-apk") | .id' 2>/dev/null)
+
+          if [ -z "$ARTIFACTS" ]; then
+            echo "✅ Aucun artifact à supprimer"
+            exit 0
+          fi
+
+          # Supprimer chaque artifact
+          COUNT=0
+          for ARTIFACT_ID in $ARTIFACTS; do
+            echo "Suppression artifact #$ARTIFACT_ID..."
+            if gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID -X DELETE 2>/dev/null; then
+              COUNT=$((COUNT + 1))
+              echo "  ✅ Supprimé"
+            else
+              echo "  ⚠️ Erreur (peut être déjà supprimé)"
+            fi
+          done
+
+          echo "✅ Cleanup terminé ($COUNT artifacts supprimés)"

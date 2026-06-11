@@ -199,6 +199,7 @@ app.post("/api/admin/resume-job", async (req, res) => {
 });
 
 // ─── BUILD & DEPLOY ───────────────────────────────────────────────────────────
+// ─── BUILD & DEPLOY — AVEC UPLOAD PLAY CONSOLE ───────────────────────────────
 app.post("/api/agents/build-deploy", async (req, res) => {
   const { jobId, log, done, fail, setWorkflowRunId } = createJob();
   res.json({ jobId });
@@ -244,24 +245,19 @@ app.post("/api/agents/build-deploy", async (req, res) => {
         "data",
       );
 
-      // Sauvegarder le workflowRunId pour relancer après redémarrage
       await setWorkflowRunId(workflowRun.id);
-
       log("Build en cours (3-8 min)...");
 
-      // ── Lancer la surveillance GitHub AVEC LOGS EN TEMPS RÉEL ──
+      // ── Lancer la surveillance GitHub ──
       startGitHubPoller(
         jobId,
         workflowRun.id,
-        // onLog callback — affiche les logs du polling dans l'app
         async (msg, type = "info") => {
           await log(msg, type);
         },
-        // onStatusChange callback — quand le workflow est terminé
         async (status, data) => {
           if (status === "completed") {
-            // Le build GitHub a réussi, continuer avec téléchargement artefacts
-            log("", ""); // Ligne vide pour séparer
+            log("", "");
             log("📦 Téléchargement des artefacts...");
 
             let aabBuffer;
@@ -298,27 +294,59 @@ app.post("/api/agents/build-deploy", async (req, res) => {
               throw new Error(`Extraction artefacts: ${zipErr.message}`);
             }
 
-            log("Upload Play Console...");
-            await githubLib.uploadToPlayConsole({
-              packageId,
-              aabBuffer,
-              listing,
-              logoBase64,
-              screenshots,
-              policyUrl,
-            });
+            // ── ✅ NOUVEAU: UPLOAD À PLAY CONSOLE ──
+            try {
+              log("", "");
+              log("🎯 Upload à Play Console...");
 
-            log("Brouillon Play Console créé ✅", "success");
-            log("Track: internal | Status: DRAFT", "data");
+              const uploadResult = await playstoreLib.uploadAABToPlayConsole(
+                packageId,
+                aabBuffer,
+                process.env.GOOGLE_PLAY_CREDENTIALS,
+              );
 
-            done({
-              apkUrl: `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`,
-              apkName: `${packageId}-release.aab`,
-              apkSize: `${(aabBuffer.length / 1024 / 1024).toFixed(1)} MB`,
-              playConsoleStatus: "DRAFT",
-              draftUrl: "https://play.google.com/console",
-              workflowRunUrl: `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`,
-            });
+              log(`✅ AAB uploadé à Play Console`, "success");
+              log(`Version Code: ${uploadResult.versionCode}`, "data");
+              log(
+                `Size: ${(uploadResult.size / 1024 / 1024).toFixed(1)} MB`,
+                "data",
+              );
+
+              log("", "");
+              log("Prêt pour review Google Play →", "info");
+              log("https://play.google.com/console", "info");
+
+              done({
+                apkUrl: uploadResult.url || "https://play.google.com/console",
+                apkName: `${packageId}-release.aab`,
+                apkSize: `${(aabBuffer.length / 1024 / 1024).toFixed(1)} MB`,
+                playConsoleStatus: "DRAFT (prêt pour review)",
+                draftUrl: "https://play.google.com/console",
+                versionCode: uploadResult.versionCode,
+                workflowRunUrl: `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`,
+              });
+            } catch (uploadErr) {
+              log(``, "");
+              log(
+                `⚠️  Erreur upload Play Console: ${uploadErr.message}`,
+                "warn",
+              );
+              log(
+                `AAB extraits mais non uploadés — tu peux l'uploader manuellement`,
+                "info",
+              );
+              log(`https://play.google.com/console`, "info");
+
+              done({
+                apkUrl: "#manual",
+                apkName: `${packageId}-release.aab`,
+                apkSize: `${(aabBuffer.length / 1024 / 1024).toFixed(1)} MB`,
+                playConsoleStatus: "MANUAL UPLOAD REQUIRED",
+                draftUrl: "https://play.google.com/console",
+                error: uploadErr.message,
+                workflowRunUrl: `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/actions/runs/${workflowRun.id}`,
+              });
+            }
           } else if (status === "failure") {
             log("", "");
             fail(new Error("❌ GitHub Actions build échoué"));
@@ -730,6 +758,277 @@ app.get("/api/debug/system", (req, res) => {
         Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + " MB",
     },
   });
+});
+
+// ─── PREVIEW ENDPOINT ─────────────────────────────────────────────────────────
+/**
+ * GET /api/preview/:jobId
+ * Affiche les logos et screenshots générés pour un job
+ */
+app.get("/api/preview/:jobId", async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const jobQueue = require("./lib/jobQueue");
+
+    const state = await jobQueue.getJobStatus(jobId, 0);
+
+    if (!state.found) {
+      return res.status(404).json({ error: `Job ${jobId} not found` });
+    }
+
+    const result = state.result || {};
+    const logos = result.formats || {};
+    const screenshots = result.screenshots || [];
+
+    // Générer le HTML d'aperçu
+    const html = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App Preview - ${jobId}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 40px;
+      font-size: 32px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .section {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+    .section h2 {
+      color: #333;
+      margin-bottom: 30px;
+      font-size: 24px;
+      border-bottom: 3px solid #667eea;
+      padding-bottom: 15px;
+    }
+    .logos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 30px;
+      margin-bottom: 20px;
+    }
+    .logo-card {
+      text-align: center;
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 12px;
+      border: 2px solid #e0e0e0;
+      transition: all 0.3s ease;
+    }
+    .logo-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
+      transform: translateY(-5px);
+    }
+    .logo-card img {
+      max-width: 100%;
+      height: 120px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      object-fit: contain;
+    }
+    .logo-card p {
+      font-size: 12px;
+      color: #666;
+      margin: 0;
+    }
+    .screenshots-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 30px;
+      margin-bottom: 20px;
+    }
+    .screenshot-card {
+      background: #f8f9fa;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid #e0e0e0;
+      transition: all 0.3s ease;
+    }
+    .screenshot-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
+      transform: translateY(-5px);
+    }
+    .screenshot-card img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .screenshot-name {
+      padding: 15px;
+      text-align: center;
+      font-size: 14px;
+      color: #333;
+      font-weight: 600;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #999;
+    }
+    .empty-state p {
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+    .download-btn {
+      display: inline-block;
+      background: #667eea;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      text-decoration: none;
+      margin-top: 20px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    .download-btn:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+    .job-info {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+      border-left: 4px solid #667eea;
+    }
+    .job-info p {
+      margin: 8px 0;
+      color: #333;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .job-info strong {
+      color: #667eea;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎨 App Preview</h1>
+    
+    <div class="section">
+      <div class="job-info">
+        <p><strong>Job ID:</strong> ${jobId}</p>
+        <p><strong>Status:</strong> ${state.status}</p>
+        <p><strong>Generated:</strong> ${new Date().toLocaleString("fr-FR")}</p>
+      </div>
+    </div>
+
+    ${
+      logos.logo512 || logos.logo192 || logos.logo48
+        ? `
+    <div class="section">
+      <h2>🎯 Logo Assets</h2>
+      <div class="logos-grid">
+        ${
+          logos.logo512
+            ? `
+        <div class="logo-card">
+          <img src="data:image/png;base64,${logos.logo512}" alt="Logo 512x512">
+          <p>512×512</p>
+        </div>
+        `
+            : ""
+        }
+        ${
+          logos.logo192
+            ? `
+        <div class="logo-card">
+          <img src="data:image/png;base64,${logos.logo192}" alt="Logo 192x192">
+          <p>192×192</p>
+        </div>
+        `
+            : ""
+        }
+        ${
+          logos.logo48
+            ? `
+        <div class="logo-card">
+          <img src="data:image/png;base64,${logos.logo48}" alt="Logo 48x48">
+          <p>48×48</p>
+        </div>
+        `
+            : ""
+        }
+      </div>
+    </div>
+    `
+        : `
+    <div class="section">
+      <div class="empty-state">
+        <p>📭 Aucun logo disponible</p>
+      </div>
+    </div>
+    `
+    }
+
+    ${
+      screenshots && screenshots.length > 0
+        ? `
+    <div class="section">
+      <h2>📱 Screenshots</h2>
+      <div class="screenshots-grid">
+        ${screenshots
+          .map(
+            (ss, i) => `
+        <div class="screenshot-card">
+          <img src="data:image/png;base64,${ss.b64}" alt="${ss.name || "Screenshot " + (i + 1)}">
+          <div class="screenshot-name">${ss.name || "Screenshot " + (i + 1)}</div>
+        </div>
+        `,
+          )
+          .join("")}
+      </div>
+    </div>
+    `
+        : `
+    <div class="section">
+      <div class="empty-state">
+        <p>📭 Aucun screenshot disponible</p>
+      </div>
+    </div>
+    `
+    }
+
+    <div class="section" style="text-align: center;">
+      <button class="download-btn" onclick="window.history.back()">← Retour</button>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.use(express.static(path.join(__dirname, "public")));

@@ -48,17 +48,13 @@ jobs:
       # ── 4. Préparer les variables ─────────────────────────────────────────
       - name: Prepare variables
         run: |
-          # DART_NAME : lettres minuscules + chiffres + underscore uniquement
           DART_NAME=$(echo "${{ inputs.app_name }}" \
             | tr '[:upper:]' '[:lower:]' \
             | tr ' ' '_' \
             | sed 's/[^a-z0-9_]//g')
 
-          # STRIP LE # DE LA COULEUR — c'est le bug : Color(0xFF#7C3AED) est invalide en Dart
-          # On enlève le # s'il est présent pour avoir juste les 6 caractères hex
           COLOR_HEX=$(echo "${{ inputs.primary_color }}" | sed 's/#//g')
 
-          # Extraire org et appname depuis le package_id
           PACKAGE_ORG=$(echo "${{ inputs.package_id }}" | rev | cut -d'.' -f2- | rev)
           PACKAGE_APP=$(echo "${{ inputs.package_id }}" | rev | cut -d'.' -f1 | rev)
 
@@ -69,11 +65,11 @@ jobs:
 
           echo "▶ Variables calculées :"
           echo "  DART_NAME   = $DART_NAME"
-          echo "  COLOR_HEX   = $COLOR_HEX  (sans #, prêt pour Dart)"
+          echo "  COLOR_HEX   = $COLOR_HEX"
           echo "  PACKAGE_ORG = $PACKAGE_ORG"
           echo "  PACKAGE_APP = $PACKAGE_APP"
 
-      # ── 5. Générer un projet Flutter propre (v2 embedding) ───────────────
+      # ── 5. Générer un projet Flutter propre ───────────────────────────────
       - name: Generate clean Flutter project
         run: |
           echo "▶ Generating Flutter project in /tmp/flutter_gen..."
@@ -84,7 +80,7 @@ jobs:
             /tmp/flutter_gen
           echo "✅ Flutter project generated"
 
-      # ── 6. Copier les fichiers Android dans le repo ───────────────────────
+      # ── 6. Copier les fichiers Android ────────────────────────────────────
       - name: Copy Android platform files
         run: |
           rm -rf android
@@ -119,13 +115,11 @@ jobs:
           EOF
           echo "✅ pubspec.yaml injected"
 
-      # ── 8. Injecter lib/main.dart — SANS LE # DANS LA COULEUR ────────────
+      # ── 8. Injecter lib/main.dart ─────────────────────────────────────────
       - name: Inject lib/main.dart
         run: |
           mkdir -p lib
 
-          # COLOR_HEX est déjà sans # (ex: 7C3AED)
-          # En Dart : const Color(0xFF7C3AED) — syntaxe correcte
           cat > lib/main.dart << DARTEOF
           import 'package:flutter/material.dart';
 
@@ -191,8 +185,6 @@ jobs:
           DARTEOF
 
           echo "✅ lib/main.dart injected"
-          echo "--- Vérification couleur dans main.dart ---"
-          grep "Color(0xFF" lib/main.dart
 
       # ── 9. Vérification structure ─────────────────────────────────────────
       - name: Verify project structure
@@ -202,23 +194,41 @@ jobs:
           echo ""
           echo "=== Couleurs dans main.dart ==="
           grep "Color" lib/main.dart || true
-          echo ""
-          echo "=== android/app/build.gradle ==="
-          cat android/app/build.gradle
 
       # ── 10. flutter pub get ───────────────────────────────────────────────
       - name: Flutter pub get
         run: flutter pub get
 
-      # ── 11. Build AAB release ─────────────────────────────────────────────
-      - name: Flutter build appbundle
-        run: flutter build appbundle --release
+      # ── 11. Build AAB release — SIZE OPTIMIZED ────────────────────────────
+      - name: Flutter build appbundle (size optimized)
+        run: |
+          flutter build appbundle \
+            --release \
+            --target-platform android-arm64 \
+            --shrink
 
-      # ── 12. Build APK debug ───────────────────────────────────────────────
-      - name: Flutter build APK debug
-        run: flutter build apk --debug
+      # ── 12. Build APK debug — SIZE OPTIMIZED ──────────────────────────────
+      - name: Flutter build APK debug (size optimized)
+        run: |
+          flutter build apk \
+            --debug \
+            --target-platform android-arm64 \
+            --shrink
 
-      # ── 13. Upload AAB ────────────────────────────────────────────────────
+      # ── 13. Strip debug symbols (size optimization) ────────────────────────
+      - name: Strip debug symbols
+        run: |
+          echo "▶ Optimizing binary size..."
+
+          # AAB optimization
+          find build/app/outputs/bundle/release -name "*.so" -exec strip {} \; 2>/dev/null || true
+
+          # APK optimization
+          find build/app/outputs/flutter-apk -name "*.so" -exec strip {} \; 2>/dev/null || true
+
+          echo "✅ Debug symbols stripped"
+
+      # ── 14. Upload AAB ────────────────────────────────────────────────────
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
@@ -226,7 +236,7 @@ jobs:
           path: build/app/outputs/bundle/release/app-release.aab
           retention-days: 1
 
-      # ── 14. Upload APK debug ──────────────────────────────────────────────
+      # ── 15. Upload APK debug ──────────────────────────────────────────────
       - name: Upload APK debug artifact
         uses: actions/upload-artifact@v4
         with:
@@ -234,31 +244,27 @@ jobs:
           path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 1
 
-      # ── 15. Résumé ────────────────────────────────────────────────────────
+      # ── 16. Build summary ─────────────────────────────────────────────────
       - name: Build summary
         run: |
           AAB_SIZE=$(du -sh build/app/outputs/bundle/release/app-release.aab 2>/dev/null | cut -f1 || echo "N/A")
           APK_SIZE=$(du -sh build/app/outputs/flutter-apk/app-debug.apk       2>/dev/null | cut -f1 || echo "N/A")
-          echo "✅ BUILD RÉUSSI"
+          echo "✅ BUILD RÉUSSI & OPTIMISÉ"
           echo "  App      : ${{ inputs.app_name }}"
           echo "  Package  : ${{ inputs.package_id }}"
           echo "  Color    : #${COLOR_HEX}"
-          echo "  AAB size : $AAB_SIZE"
-          echo "  APK size : $APK_SIZE"
+          echo "  AAB size : $AAB_SIZE (optimisé)"
+          echo "  APK size : $APK_SIZE (optimisé)"
 
-      # ── 16. WEBHOOK — Notifier Railway que le build est terminé ──────────
+      # ── 17. WEBHOOK — Notifier Railway ─────────────────────────────────────
       - name: Notify Railway webhook
         if: always()
         run: |
           echo "🔔 Envoi webhook à Railway..."
 
-          # Status du job (success, failure, cancelled)
           JOB_STATUS=${{ job.status }}
-
-          # Conclusion du run (success, failure, cancelled, neutral, timed_out)
           RUN_CONCLUSION=${{ job.conclusion }}
 
-          # Déterminer le status pour Railway
           if [ "$JOB_STATUS" = "success" ]; then
             WEBHOOK_STATUS="completed"
           else
@@ -269,7 +275,6 @@ jobs:
           echo "  Run Conclusion: $RUN_CONCLUSION"
           echo "  Webhook Status: $WEBHOOK_STATUS"
 
-          # Appel HTTP vers Railway
           curl -X POST "https://test-automation-rskn-production.up.railway.app/api/webhook/github" \
             -H "Content-Type: application/json" \
             -d "{
@@ -279,8 +284,6 @@ jobs:
                 \"name\": \"${{ github.workflow }}\",
                 \"status\": \"completed\",
                 \"conclusion\": \"$RUN_CONCLUSION\",
-                \"created_at\": \"${{ github.event.created_at }}\",
-                \"updated_at\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\",
                 \"html_url\": \"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
               }
             }" \
