@@ -144,7 +144,7 @@ export default function App() {
                 jobId && (
                   <div className="preview-container">
                     <a
-                      href={`/api/preview/${jobId}`}
+                      href={`/api/preview/${jobId}/html`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="preview-button"

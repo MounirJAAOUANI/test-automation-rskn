@@ -720,7 +720,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "package_dependencies",
-      "community": 1,
+      "community": 26,
       "norm_label": "dependencies"
     },
     {
@@ -730,7 +730,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "package_dependencies_react_native_google_signin_google_signin",
-      "community": 1,
+      "community": 26,
       "norm_label": "@react-native-google-signin/google-signin"
     },
     {
@@ -740,7 +740,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "package_dependencies_cors",
-      "community": 1,
+      "community": 26,
       "norm_label": "cors"
     },
     {
@@ -750,7 +750,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "package_dependencies_dotenv",
-      "community": 1,
+      "community": 26,
       "norm_label": "dotenv"
     },
     {
@@ -760,7 +760,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "package_dependencies_express",
-      "community": 1,
+      "community": 26,
       "norm_label": "express"
     },
     {
@@ -770,7 +770,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "package_dependencies_firebase_admin",
-      "community": 1,
+      "community": 26,
       "norm_label": "firebase-admin"
     },
     {
@@ -780,7 +780,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "package_dependencies_google_play_api",
-      "community": 1,
+      "community": 26,
       "norm_label": "google-play-api"
     },
     {
@@ -790,7 +790,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "package_dependencies_google_play_scraper",
-      "community": 1,
+      "community": 26,
       "norm_label": "google-play-scraper"
     },
     {
@@ -800,7 +800,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "package_dependencies_react",
-      "community": 1,
+      "community": 26,
       "norm_label": "react"
     },
     {
@@ -810,7 +810,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "package_dependencies_react_dom",
-      "community": 1,
+      "community": 26,
       "norm_label": "react-dom"
     },
     {
@@ -820,7 +820,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "package_dependencies_sharp",
-      "community": 1,
+      "community": 26,
       "norm_label": "sharp"
     },
     {
@@ -1424,10 +1424,20 @@
       "norm_label": "getadmin()"
     },
     {
+      "label": "getDatabase()",
+      "file_type": "code",
+      "source_file": "server/lib/firebase.js",
+      "source_location": "L39",
+      "_origin": "ast",
+      "id": "lib_firebase_getdatabase",
+      "community": 18,
+      "norm_label": "getdatabase()"
+    },
+    {
       "label": "setupRemoteConfig()",
       "file_type": "code",
       "source_file": "server/lib/firebase.js",
-      "source_location": "L51",
+      "source_location": "L44",
       "_origin": "ast",
       "id": "lib_firebase_setupremoteconfig",
       "community": 18,
@@ -1857,7 +1867,7 @@
       "label": "submitAppForReview()",
       "file_type": "code",
       "source_file": "server/lib/playstore.js",
-      "source_location": "L201",
+      "source_location": "L206",
       "_origin": "ast",
       "id": "lib_playstore_submitappforreview",
       "community": 14,
@@ -5035,11 +5045,32 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "server/lib/firebase.js",
+      "source_location": "L39",
+      "weight": 1.0,
+      "source": "lib_firebase",
+      "target": "lib_firebase_getdatabase",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/lib/firebase.js",
       "source_location": "L51",
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "lib_firebase",
       "target": "lib_firebase_setupremoteconfig"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server/lib/firebase.js",
+      "source_location": "L40",
+      "weight": 1.0,
+      "source": "lib_firebase_getdatabase",
+      "target": "lib_firebase_getadmin",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -7283,5 +7314,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "aa1e04c0c48d56b80ffc04f9fc18e9bae23734e5"
+  "built_at_commit": "9fb91357bc9cc12975c0bac70467c4bd5b9bc97d"
 }

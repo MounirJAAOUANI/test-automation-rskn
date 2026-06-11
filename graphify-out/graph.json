@@ -524,6 +524,16 @@
       "norm_label": "buildbuilddeploypayload()"
     },
     {
+      "label": "executeStep()",
+      "file_type": "code",
+      "source_file": "client/src/steps/index.js",
+      "source_location": "L97",
+      "_origin": "ast",
+      "id": "steps_index_executestep",
+      "community": 12,
+      "norm_label": "executestep()"
+    },
+    {
       "label": "vite.config.js",
       "file_type": "code",
       "source_file": "client/vite.config.js",
@@ -1424,10 +1434,20 @@
       "norm_label": "getadmin()"
     },
     {
+      "label": "getDatabase()",
+      "file_type": "code",
+      "source_file": "server/lib/firebase.js",
+      "source_location": "L39",
+      "_origin": "ast",
+      "id": "lib_firebase_getdatabase",
+      "community": 18,
+      "norm_label": "getdatabase()"
+    },
+    {
       "label": "setupRemoteConfig()",
       "file_type": "code",
       "source_file": "server/lib/firebase.js",
-      "source_location": "L51",
+      "source_location": "L44",
       "_origin": "ast",
       "id": "lib_firebase_setupremoteconfig",
       "community": 18,
@@ -3741,6 +3761,17 @@
       "target": "steps_index"
     },
     {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "client/src/App.jsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_app",
+      "target": "steps_index_executestep",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
@@ -4014,6 +4045,27 @@
       "confidence_score": 1.0,
       "source": "steps_index",
       "target": "steps_index_buildscreenshotspayload"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "client/src/steps/index.js",
+      "source_location": "L97",
+      "weight": 1.0,
+      "source": "steps_index",
+      "target": "steps_index_executestep",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "client/src/steps/index.js",
+      "source_location": "L120",
+      "weight": 1.0,
+      "source": "steps_index_executestep",
+      "target": "lib_github_fetch"
     },
     {
       "relation": "defines",
@@ -5035,11 +5087,32 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "server/lib/firebase.js",
+      "source_location": "L39",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "lib_firebase",
+      "target": "lib_firebase_getdatabase"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server/lib/firebase.js",
       "source_location": "L51",
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "lib_firebase",
       "target": "lib_firebase_setupremoteconfig"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "server/lib/firebase.js",
+      "source_location": "L40",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "lib_firebase_getdatabase",
+      "target": "lib_firebase_getadmin"
     },
     {
       "relation": "calls",
@@ -7283,5 +7356,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "aa1e04c0c48d56b80ffc04f9fc18e9bae23734e5"
+  "built_at_commit": "9fb91357bc9cc12975c0bac70467c4bd5b9bc97d"
 }
