@@ -1,16 +1,16 @@
 # Graph Report - test-automation-rskn  (2026-06-11)
 
 ## Corpus Check
-- 30 files · ~91,115 words
+- 30 files · ~92,381 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 358 nodes · 370 edges · 26 communities (22 shown, 4 thin omitted)
+- 312 nodes · 325 edges · 24 communities (20 shown, 4 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `aa1e04c0`
+- Built from commit: `03f3e4a5`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -33,20 +33,18 @@
 - [[_COMMUNITY_Privacy policy generation|Privacy policy generation]]
 - [[_COMMUNITY_Prerequisite panel|Prerequisite panel]]
 - [[_COMMUNITY_Firebase admin setup|Firebase admin setup]]
-- [[_COMMUNITY_Community 24|Community 24]]
-- [[_COMMUNITY_Community 25|Community 25]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `compilerOptions` - 17 edges
 2. `compilerOptions` - 16 edges
 3. `📱 App Factory — Autopilot Pipeline` - 12 edges
-4. `📱 App Factory — Autopilot Pipeline` - 12 edges
-5. `🔍 Dépannage {#dépannage}` - 8 edges
-6. `🔍 Dépannage {#dépannage}` - 8 edges
-7. `compilerOptions` - 7 edges
-8. `Variables du serveur (`server/.env`)` - 7 edges
-9. `Variables du serveur (`server/.env`)` - 7 edges
-10. `ask()` - 6 edges
+4. `🔍 Dépannage {#dépannage}` - 8 edges
+5. `compilerOptions` - 7 edges
+6. `Variables du serveur (`server/.env`)` - 7 edges
+7. `ask()` - 6 edges
+8. `askJSON()` - 6 edges
+9. `fetch` - 6 edges
+10. `Variables du client (`client/.env.local`)` - 6 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `generateLogo()` --calls--> `fetch`  [INFERRED]
@@ -57,15 +55,15 @@
 ## Import Cycles
 - None detected.
 
-## Communities (26 total, 4 thin omitted)
+## Communities (24 total, 4 thin omitted)
 
 ### Community 0 - "README deployment troubleshooting"
 Cohesion: 0.06
-Nodes (31): 📱 App Factory — Autopilot Pipeline, "Cannot read private_key", Comptes à créer (pour le mode production), 🔍 Dépannage {#dépannage}, ☁️ Déploiement sur Railway {#railway}, Erreur CORS, ⚙️ Installation locale {#installation}, 🚀 Lancer l'application en développement {#développement} (+23 more)
+Nodes (31): author, bugs, url, dependencies, cors, dotenv, express, firebase-admin (+23 more)
 
 ### Community 1 - "Root package metadata"
 Cohesion: 0.06
-Nodes (31): author, bugs, url, dependencies, cors, dotenv, express, firebase-admin (+23 more)
+Nodes (31): 📱 App Factory — Autopilot Pipeline, "Cannot read private_key", Comptes à créer (pour le mode production), 🔍 Dépannage {#dépannage}, ☁️ Déploiement sur Railway {#railway}, Erreur CORS, ⚙️ Installation locale {#installation}, 🚀 Lancer l'application en développement {#développement} (+23 more)
 
 ### Community 2 - "GitHub poller and job queue"
 Cohesion: 0.09
@@ -115,30 +113,22 @@ Nodes (9): compilerOptions, noImplicitAny, noUnusedLocals, noUnusedParameters, s
 Cohesion: 0.33
 Nodes (6): build, HomePage, main, MyApp, package:flutter/material.dart, StatelessWidget
 
-### Community 24 - "Community 24"
-Cohesion: 0.06
-Nodes (31): 📱 App Factory — Autopilot Pipeline, "Cannot read private_key", Comptes à créer (pour le mode production), 🔍 Dépannage {#dépannage}, ☁️ Déploiement sur Railway {#railway}, Erreur CORS, ⚙️ Installation locale {#installation}, 🚀 Lancer l'application en développement {#développement} (+23 more)
-
-### Community 25 - "Community 25"
-Cohesion: 0.14
-Nodes (14): `ANTHROPIC_API_KEY`, 🔑 Configuration des variables d'environnement {#variables}, `FIREBASE_SERVICE_ACCOUNT` — Comment récupérer le JSON GCP, `GOOGLE_PLAY_SERVICE_ACCOUNT` — Même procédure, `MODE_ENV`, `MOT_DEBUG`, `OPENAI_API_KEY`, Variables du client (`client/.env.local`) (+6 more)
-
 ## Knowledge Gaps
-- **219 isolated node(s):** `name`, `version`, `private`, `type`, `dev` (+214 more)
+- **184 isolated node(s):** `name`, `version`, `private`, `type`, `dev` (+179 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `📱 App Factory — Autopilot Pipeline` connect `Community 24` to `Community 25`?**
+- **Why does `📱 App Factory — Autopilot Pipeline` connect `Root package metadata` to `Env vars and secrets`?**
+  _High betweenness centrality (0.018) - this node is a cross-community bridge._
+- **Why does `devDependencies` connect `Dev build tooling` to `README deployment troubleshooting`?**
   _High betweenness centrality (0.013) - this node is a cross-community bridge._
-- **Why does `📱 App Factory — Autopilot Pipeline` connect `README deployment troubleshooting` to `Env vars and secrets`?**
-  _High betweenness centrality (0.013) - this node is a cross-community bridge._
-- **Why does `devDependencies` connect `Dev build tooling` to `Root package metadata`?**
+- **Why does `🔑 Configuration des variables d'environnement {#variables}` connect `Env vars and secrets` to `Root package metadata`?**
   _High betweenness centrality (0.010) - this node is a cross-community bridge._
 - **What connects `name`, `version`, `private` to the rest of the system?**
-  _219 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _184 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `README deployment troubleshooting` be split into smaller, more focused modules?**
   _Cohesion score 0.0625 - nodes in this community are weakly interconnected._
 - **Should `Root package metadata` be split into smaller, more focused modules?**
