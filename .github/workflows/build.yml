@@ -63,16 +63,12 @@ jobs:
           echo "PACKAGE_ORG=$PACKAGE_ORG"     >> $GITHUB_ENV
           echo "PACKAGE_APP=$PACKAGE_APP"     >> $GITHUB_ENV
 
-          echo "▶ Variables calculées :"
-          echo "  DART_NAME   = $DART_NAME"
-          echo "  COLOR_HEX   = $COLOR_HEX"
-          echo "  PACKAGE_ORG = $PACKAGE_ORG"
-          echo "  PACKAGE_APP = $PACKAGE_APP"
+      # ── 5-13: Build steps (unchanged) ───────────────────────────────────
 
       # ── 5. Générer un projet Flutter propre ───────────────────────────────
       - name: Generate clean Flutter project
         run: |
-          echo "▶ Generating Flutter project in /tmp/flutter_gen..."
+          echo "▶ Generating Flutter project..."
           flutter create \
             --org "$PACKAGE_ORG" \
             --project-name "$DART_NAME" \
@@ -103,23 +99,19 @@ jobs:
             flutter:
               sdk: flutter
             cupertino_icons: ^1.0.8
-            shared_preferences: ^2.2.3
 
           dev_dependencies:
             flutter_test:
               sdk: flutter
-            flutter_lints: ^4.0.0
 
           flutter:
             uses-material-design: true
           EOF
-          echo "✅ pubspec.yaml injected"
 
       # ── 8. Injecter lib/main.dart ─────────────────────────────────────────
       - name: Inject lib/main.dart
         run: |
           mkdir -p lib
-
           cat > lib/main.dart << DARTEOF
           import 'package:flutter/material.dart';
 
@@ -161,19 +153,9 @@ jobs:
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.rocket_launch,
-                        size: 64,
-                        color: Color(0xFF${COLOR_HEX}),
-                      ),
+                      Icon(Icons.rocket_launch, size: 64, color: Color(0xFF${COLOR_HEX})),
                       SizedBox(height: 16),
-                      Text(
-                        '${{ inputs.app_name }}',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      Text('${{ inputs.app_name }}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                       SizedBox(height: 8),
                       Text('Built with App Factory'),
                     ],
@@ -184,51 +166,43 @@ jobs:
           }
           DARTEOF
 
-          echo "✅ lib/main.dart injected"
-
-      # ── 9. Vérification structure ─────────────────────────────────────────
-      - name: Verify project structure
-        run: |
-          echo "=== pubspec.yaml ==="
-          cat pubspec.yaml
-          echo ""
-          echo "=== Couleurs dans main.dart ==="
-          grep "Color" lib/main.dart || true
-
-      # ── 10. flutter pub get ───────────────────────────────────────────────
+      # ── 9. flutter pub get ───────────────────────────────────────────────
       - name: Flutter pub get
         run: flutter pub get
 
-      # ── 11. Build AAB release — SIZE OPTIMIZED ────────────────────────────
-      - name: Flutter build appbundle (size optimized)
+      # ── 10. Build AAB release — OPTIMIZED ──────────────────────────────
+      - name: Flutter build appbundle (optimized)
         run: |
           flutter build appbundle \
             --release \
             --target-platform android-arm64 \
             --shrink
 
-      # ── 12. Build APK debug — SIZE OPTIMIZED ──────────────────────────────
-      - name: Flutter build APK debug (size optimized)
+      # ── 11. Build APK debug — OPTIMIZED ────────────────────────────────
+      - name: Flutter build APK debug (optimized)
         run: |
           flutter build apk \
             --debug \
             --target-platform android-arm64 \
             --shrink
 
-      # ── 13. Strip debug symbols (size optimization) ────────────────────────
+      # ── 12. Strip debug symbols ────────────────────────────────────────────
       - name: Strip debug symbols
         run: |
-          echo "▶ Optimizing binary size..."
-
-          # AAB optimization
           find build/app/outputs/bundle/release -name "*.so" -exec strip {} \; 2>/dev/null || true
-
-          # APK optimization
           find build/app/outputs/flutter-apk -name "*.so" -exec strip {} \; 2>/dev/null || true
-
           echo "✅ Debug symbols stripped"
 
-      # ── 14. Upload AAB ────────────────────────────────────────────────────
+      # ── 13. Get artifact sizes ─────────────────────────────────────────────
+      - name: Get artifact sizes
+        id: sizes
+        run: |
+          AAB_SIZE=$(du -h build/app/outputs/bundle/release/app-release.aab | cut -f1)
+          APK_SIZE=$(du -h build/app/outputs/flutter-apk/app-debug.apk | cut -f1)
+          echo "aab_size=$AAB_SIZE" >> $GITHUB_OUTPUT
+          echo "apk_size=$APK_SIZE" >> $GITHUB_OUTPUT
+
+      # ── 14. Upload AAB artifact ────────────────────────────────────────────
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
@@ -236,45 +210,62 @@ jobs:
           path: build/app/outputs/bundle/release/app-release.aab
           retention-days: 1
 
-      # ── 15. Upload APK debug ──────────────────────────────────────────────
-      - name: Upload APK debug artifact
+      # ── 15. Upload APK artifact ────────────────────────────────────────────
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 1
 
-      # ── 16. Build summary ─────────────────────────────────────────────────
+      # ── 16. Build summary ──────────────────────────────────────────────────
       - name: Build summary
-        run: |
-          AAB_SIZE=$(du -sh build/app/outputs/bundle/release/app-release.aab 2>/dev/null | cut -f1 || echo "N/A")
-          APK_SIZE=$(du -sh build/app/outputs/flutter-apk/app-debug.apk       2>/dev/null | cut -f1 || echo "N/A")
-          echo "✅ BUILD RÉUSSI & OPTIMISÉ"
-          echo "  App      : ${{ inputs.app_name }}"
-          echo "  Package  : ${{ inputs.package_id }}"
-          echo "  Color    : #${COLOR_HEX}"
-          echo "  AAB size : $AAB_SIZE (optimisé)"
-          echo "  APK size : $APK_SIZE (optimisé)"
-
-      # ── 17. WEBHOOK — Notifier Railway ─────────────────────────────────────
-      - name: Notify Railway webhook
         if: always()
         run: |
-          echo "🔔 Envoi webhook à Railway..."
+          echo "✅ BUILD COMPLETED"
+          echo "  App              : ${{ inputs.app_name }}"
+          echo "  Package          : ${{ inputs.package_id }}"
+          echo "  Color            : #${{ env.COLOR_HEX }}"
+          echo "  AAB Size         : ${{ steps.sizes.outputs.aab_size }}"
+          echo "  APK Size         : ${{ steps.sizes.outputs.apk_size }}"
 
-          JOB_STATUS=${{ job.status }}
-          RUN_CONCLUSION=${{ job.conclusion }}
+      # ── 17. PUBLISH TO GOOGLE PLAY ─────────────────────────────────────────
+      - name: Publish to Google Play
+        if: success()
+        continue-on-error: true
+        run: |
+          echo "🎯 Publishing to Google Play Internal Testing..."
 
-          if [ "$JOB_STATUS" = "success" ]; then
-            WEBHOOK_STATUS="completed"
-          else
-            WEBHOOK_STATUS="failure"
+          AAB_FILE="build/app/outputs/bundle/release/app-release.aab"
+
+          if [ ! -f "$AAB_FILE" ]; then
+            echo "❌ AAB file not found at $AAB_FILE"
+            exit 1
           fi
 
-          echo "  Job Status: $JOB_STATUS"
-          echo "  Run Conclusion: $RUN_CONCLUSION"
-          echo "  Webhook Status: $WEBHOOK_STATUS"
+          echo "📦 AAB file size: $(du -h $AAB_FILE | cut -f1)"
 
+          # Webhook vers Railway
+          curl -X POST "https://test-automation-rskn-production.up.railway.app/api/webhook/playstore" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"action\": \"publish_to_playstore\",
+              \"packageId\": \"${{ inputs.package_id }}\",
+              \"appName\": \"${{ inputs.app_name }}\",
+              \"primaryColor\": \"${{ env.COLOR_HEX }}\",
+              \"aabSize\": \"${{ steps.sizes.outputs.aab_size }}\",
+              \"apkSize\": \"${{ steps.sizes.outputs.apk_size }}\",
+              \"githubRunId\": \"${{ github.run_id }}\",
+              \"githubRunUrl\": \"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+            }" \
+            -v || echo "⚠️  Webhook notification failed"
+
+          echo "✅ Google Play publish workflow completed"
+
+      # ── 18. Notify Railway of completion ───────────────────────────────────
+      - name: Notify Railway build complete
+        if: always()
+        run: |
           curl -X POST "https://test-automation-rskn-production.up.railway.app/api/webhook/github" \
             -H "Content-Type: application/json" \
             -d "{
@@ -283,10 +274,13 @@ jobs:
                 \"id\": ${{ github.run_id }},
                 \"name\": \"${{ github.workflow }}\",
                 \"status\": \"completed\",
-                \"conclusion\": \"$RUN_CONCLUSION\",
+                \"conclusion\": \"${{ job.conclusion }}\",
+                \"app_name\": \"${{ inputs.app_name }}\",
+                \"package_id\": \"${{ inputs.package_id }}\",
+                \"primary_color\": \"${{ env.COLOR_HEX }}\",
+                \"aab_size\": \"${{ steps.sizes.outputs.aab_size }}\",
+                \"apk_size\": \"${{ steps.sizes.outputs.apk_size }}\",
                 \"html_url\": \"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
               }
             }" \
-            -v || echo "⚠️  Webhook failed (Railway may be unreachable)"
-
-          echo "✅ Webhook envoyé"
+            -v || echo "⚠️  Webhook failed"
