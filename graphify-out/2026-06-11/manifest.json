@@ -10,9 +10,9 @@
     "semantic_hash": "33899054464aa2f2570e159cc399328c"
   },
   "client/src/App.jsx": {
-    "mtime": 1781212412.358434,
-    "ast_hash": "6ffcbb23c6093a0cc1f5e617c43e67d6",
-    "semantic_hash": ""
+    "mtime": 1781175669.0929103,
+    "ast_hash": "266d29b5b8cd68682832e166bd98b228",
+    "semantic_hash": "266d29b5b8cd68682832e166bd98b228"
   },
   "client/src/api.js": {
     "mtime": 1780518609.1211674,
@@ -75,8 +75,8 @@
     "semantic_hash": "8fce626d4a69316d88c7adb90e05f4c2"
   },
   "server/index.js": {
-    "mtime": 1781212231.2467792,
-    "ast_hash": "91bea7d6b5ecb7598562839006b584f2",
+    "mtime": 1781210419.4730713,
+    "ast_hash": "647811a2699e2655d70dbcde655143c9",
     "semantic_hash": ""
   },
   "server/lib/claude.js": {
@@ -85,9 +85,9 @@
     "semantic_hash": "e77e43b4631b0f4f07cd2a3d52566d43"
   },
   "server/lib/firebase.js": {
-    "mtime": 1781212215.536613,
-    "ast_hash": "0e5d6837258decf7e93914824944bfeb",
-    "semantic_hash": ""
+    "mtime": 1780267165.237879,
+    "ast_hash": "9ed71da2593432efd98b59623b451a5a",
+    "semantic_hash": "9ed71da2593432efd98b59623b451a5a"
   },
   "server/lib/github-poller.js": {
     "mtime": 1780519052.1714468,
@@ -110,8 +110,8 @@
     "semantic_hash": "4085a2420cb02cd6887d13a2da18c150"
   },
   "server/lib/playstore.js": {
-    "mtime": 1781211178.9117126,
-    "ast_hash": "dd9c3e9a62d0f98c0ff267df45d27e18",
+    "mtime": 1781210398.992477,
+    "ast_hash": "a81928d864d98b8ddf81ef1cfb10eb91",
     "semantic_hash": ""
   },
   "server/lib/privacypolicy.js": {
@@ -482,11 +482,6 @@
   "policies/com-appfactory-thrift-privacy.html": {
     "mtime": 1781206762.5152984,
     "ast_hash": "384d060b7ad3adfc0e65766bfefde1a2",
-    "semantic_hash": ""
-  },
-  "policies/com-appfactory-spendsmart-privacy.html": {
-    "mtime": 1781211128.3232157,
-    "ast_hash": "fdab5ec7f0ccc0db8b1284bea0497572",
     "semantic_hash": ""
   }
 }

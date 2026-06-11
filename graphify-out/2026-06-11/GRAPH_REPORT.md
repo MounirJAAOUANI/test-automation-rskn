@@ -1,16 +1,16 @@
 # Graph Report - test-automation-rskn  (2026-06-11)
 
 ## Corpus Check
-- 30 files · ~92,314 words
+- 30 files · ~91,133 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 359 nodes · 372 edges · 27 communities (24 shown, 3 thin omitted)
+- 358 nodes · 370 edges · 26 communities (22 shown, 4 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `9fb91357`
+- Built from commit: `aa1e04c0`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -35,7 +35,6 @@
 - [[_COMMUNITY_Firebase admin setup|Firebase admin setup]]
 - [[_COMMUNITY_Community 24|Community 24]]
 - [[_COMMUNITY_Community 25|Community 25]]
-- [[_COMMUNITY_Community 26|Community 26]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `compilerOptions` - 17 edges
@@ -58,15 +57,15 @@
 ## Import Cycles
 - None detected.
 
-## Communities (27 total, 3 thin omitted)
+## Communities (26 total, 4 thin omitted)
 
 ### Community 0 - "README deployment troubleshooting"
 Cohesion: 0.06
 Nodes (31): 📱 App Factory — Autopilot Pipeline, "Cannot read private_key", Comptes à créer (pour le mode production), 🔍 Dépannage {#dépannage}, ☁️ Déploiement sur Railway {#railway}, Erreur CORS, ⚙️ Installation locale {#installation}, 🚀 Lancer l'application en développement {#développement} (+23 more)
 
 ### Community 1 - "Root package metadata"
-Cohesion: 0.10
-Nodes (20): author, bugs, url, description, homepage, keywords, license, main (+12 more)
+Cohesion: 0.06
+Nodes (31): author, bugs, url, dependencies, cors, dotenv, express, firebase-admin (+23 more)
 
 ### Community 2 - "GitHub poller and job queue"
 Cohesion: 0.09
@@ -116,10 +115,6 @@ Nodes (9): compilerOptions, noImplicitAny, noUnusedLocals, noUnusedParameters, s
 Cohesion: 0.33
 Nodes (6): build, HomePage, main, MyApp, package:flutter/material.dart, StatelessWidget
 
-### Community 18 - "Firebase admin setup"
-Cohesion: 0.83
-Nodes (3): getAdmin(), getDatabase(), setupRemoteConfig()
-
 ### Community 24 - "Community 24"
 Cohesion: 0.06
 Nodes (31): 📱 App Factory — Autopilot Pipeline, "Cannot read private_key", Comptes à créer (pour le mode production), 🔍 Dépannage {#dépannage}, ☁️ Déploiement sur Railway {#railway}, Erreur CORS, ⚙️ Installation locale {#installation}, 🚀 Lancer l'application en développement {#développement} (+23 more)
@@ -128,14 +123,10 @@ Nodes (31): 📱 App Factory — Autopilot Pipeline, "Cannot read private_key", 
 Cohesion: 0.14
 Nodes (14): `ANTHROPIC_API_KEY`, 🔑 Configuration des variables d'environnement {#variables}, `FIREBASE_SERVICE_ACCOUNT` — Comment récupérer le JSON GCP, `GOOGLE_PLAY_SERVICE_ACCOUNT` — Même procédure, `MODE_ENV`, `MOT_DEBUG`, `OPENAI_API_KEY`, Variables du client (`client/.env.local`) (+6 more)
 
-### Community 26 - "Community 26"
-Cohesion: 0.18
-Nodes (11): dependencies, cors, dotenv, express, firebase-admin, google-play-api, google-play-scraper, react (+3 more)
-
 ## Knowledge Gaps
 - **219 isolated node(s):** `name`, `version`, `private`, `type`, `dev` (+214 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **3 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -151,6 +142,6 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `README deployment troubleshooting` be split into smaller, more focused modules?**
   _Cohesion score 0.0625 - nodes in this community are weakly interconnected._
 - **Should `Root package metadata` be split into smaller, more focused modules?**
-  _Cohesion score 0.09523809523809523 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0625 - nodes in this community are weakly interconnected._
 - **Should `GitHub poller and job queue` be split into smaller, more focused modules?**
   _Cohesion score 0.09032258064516129 - nodes in this community are weakly interconnected._

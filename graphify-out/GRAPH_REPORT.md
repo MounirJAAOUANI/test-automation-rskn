@@ -1,16 +1,16 @@
 # Graph Report - test-automation-rskn  (2026-06-11)
 
 ## Corpus Check
-- 30 files · ~92,627 words
+- 30 files · ~91,137 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 360 nodes · 375 edges · 26 communities (22 shown, 4 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 2 edges (avg confidence: 0.8)
+- 358 nodes · 370 edges · 26 communities (22 shown, 4 thin omitted)
+- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `9fb91357`
+- Built from commit: `aa1e04c0`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -27,7 +27,6 @@
 - [[_COMMUNITY_GitHubOpenAI integration|GitHub/OpenAI integration]]
 - [[_COMMUNITY_Client UI config components|Client UI config components]]
 - [[_COMMUNITY_Env vars and secrets|Env vars and secrets]]
-- [[_COMMUNITY_App workflow steps|App workflow steps]]
 - [[_COMMUNITY_Base tsconfig strict settings|Base tsconfig strict settings]]
 - [[_COMMUNITY_Play Store upload|Play Store upload]]
 - [[_COMMUNITY_Flutter app UI|Flutter app UI]]
@@ -44,14 +43,12 @@
 4. `📱 App Factory — Autopilot Pipeline` - 12 edges
 5. `🔍 Dépannage {#dépannage}` - 8 edges
 6. `🔍 Dépannage {#dépannage}` - 8 edges
-7. `fetch` - 7 edges
-8. `compilerOptions` - 7 edges
+7. `compilerOptions` - 7 edges
+8. `Variables du serveur (`server/.env`)` - 7 edges
 9. `Variables du serveur (`server/.env`)` - 7 edges
-10. `Variables du serveur (`server/.env`)` - 7 edges
+10. `ask()` - 6 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `executeStep()` --calls--> `fetch`  [INFERRED]
-  client/src/steps/index.js → server/lib/github.js
 - `generateLogo()` --calls--> `fetch`  [INFERRED]
   server/lib/openai.js → server/lib/github.js
 - `initRedis()` --calls--> `startGitHubPoller()`  [EXTRACTED]
@@ -118,10 +115,6 @@ Nodes (9): compilerOptions, noImplicitAny, noUnusedLocals, noUnusedParameters, s
 Cohesion: 0.33
 Nodes (6): build, HomePage, main, MyApp, package:flutter/material.dart, StatelessWidget
 
-### Community 18 - "Firebase admin setup"
-Cohesion: 0.83
-Nodes (3): getAdmin(), getDatabase(), setupRemoteConfig()
-
 ### Community 24 - "Community 24"
 Cohesion: 0.06
 Nodes (31): 📱 App Factory — Autopilot Pipeline, "Cannot read private_key", Comptes à créer (pour le mode production), 🔍 Dépannage {#dépannage}, ☁️ Déploiement sur Railway {#railway}, Erreur CORS, ⚙️ Installation locale {#installation}, 🚀 Lancer l'application en développement {#développement} (+23 more)
@@ -138,12 +131,12 @@ Nodes (14): `ANTHROPIC_API_KEY`, 🔑 Configuration des variables d'environnemen
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `fetch` connect `GitHub/OpenAI integration` to `App workflow steps`?**
-  _High betweenness centrality (0.014) - this node is a cross-community bridge._
 - **Why does `📱 App Factory — Autopilot Pipeline` connect `Community 24` to `Community 25`?**
   _High betweenness centrality (0.013) - this node is a cross-community bridge._
 - **Why does `📱 App Factory — Autopilot Pipeline` connect `README deployment troubleshooting` to `Env vars and secrets`?**
   _High betweenness centrality (0.013) - this node is a cross-community bridge._
+- **Why does `devDependencies` connect `Dev build tooling` to `Root package metadata`?**
+  _High betweenness centrality (0.010) - this node is a cross-community bridge._
 - **What connects `name`, `version`, `private` to the rest of the system?**
   _219 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `README deployment troubleshooting` be split into smaller, more focused modules?**

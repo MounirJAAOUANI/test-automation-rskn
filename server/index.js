@@ -1138,7 +1138,7 @@ app.post("/api/webhook/playstore", async (req, res) => {
     );
 
     // Stocker le résultat dans Firebase
-    const db = firebaseLib.getDatabase();
+    const db = require("firebase-admin").database();
     const buildRef = db.ref(`builds/${githubRunId}`);
 
     await buildRef.update({
@@ -1164,7 +1164,7 @@ app.post("/api/webhook/playstore", async (req, res) => {
 
     // Ne pas échouer le build complet
     try {
-      const db = firebaseLib.getDatabase();
+      const db = require("firebase-admin").database();
       const buildRef = db.ref(`builds/${githubRunId}`);
       await buildRef.update({
         playstore_status: "error",
@@ -1193,7 +1193,7 @@ app.get("/api/preview/:jobId", async (req, res) => {
   const { jobId } = req.params;
 
   try {
-    const db = firebaseLib.getDatabase();
+    const db = require("firebase-admin").database();
     const buildRef = db.ref(`builds/${jobId}`);
     const snapshot = await buildRef.once("value");
 
@@ -1247,7 +1247,7 @@ app.get("/api/preview/:jobId/html", async (req, res) => {
   const { jobId } = req.params;
 
   try {
-    const db = firebaseLib.getDatabase();
+    const db = require("firebase-admin").database();
     const buildRef = db.ref(`builds/${jobId}`);
     const snapshot = await buildRef.once("value");
 
