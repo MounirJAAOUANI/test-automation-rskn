@@ -302,7 +302,8 @@ app.post("/api/agents/build-deploy", async (req, res) => {
               const uploadResult = await playstoreLib.uploadAABToPlayConsole(
                 packageId,
                 aabBuffer,
-                process.env.GOOGLE_PLAY_CREDENTIALS,
+                process.env.GOOGLE_PLAY_CREDENTIALS ||
+                  process.env.GOOGLE_PLAY_SERVICE_ACCOUNT,
               );
 
               log(`✅ AAB uploadé à Play Console`, "success");
@@ -1063,19 +1064,20 @@ app.post("/api/webhook/playstore", async (req, res) => {
   );
 
   try {
-    // Vérifier que les credentials existent
-    if (!process.env.GOOGLE_PLAY_SERVICE_ACCOUNT) {
+    const rawCredentials =
+      process.env.GOOGLE_PLAY_SERVICE_ACCOUNT ||
+      process.env.GOOGLE_PLAY_CREDENTIALS;
+    if (!rawCredentials) {
       throw new Error(
-        "GOOGLE_PLAY_SERVICE_ACCOUNT not configured in environment",
+        "GOOGLE_PLAY_SERVICE_ACCOUNT or GOOGLE_PLAY_CREDENTIALS not configured in environment",
       );
     }
 
-    // Parser les credentials
     let credentials;
     try {
-      credentials = JSON.parse(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT);
+      credentials = JSON.parse(rawCredentials);
     } catch (e) {
-      throw new Error(`Invalid GOOGLE_PLAY_SERVICE_ACCOUNT: ${e.message}`);
+      throw new Error(`Invalid Google Play service account JSON: ${e.message}`);
     }
 
     // Importer playstore lib
@@ -1086,12 +1088,42 @@ app.post("/api/webhook/playstore", async (req, res) => {
       throw new Error(`playstore.js not found: ${e.message}`);
     }
 
-    // Upload l'AAB à Google Play (DRAFT UNIQUEMENT)
+    // Récupérer l'AAB depuis GitHub si nécessaire
+    let aabBuffer = null;
+    if (req.body.aabBase64) {
+      aabBuffer = Buffer.from(req.body.aabBase64, "base64");
+    } else if (githubRunId) {
+      const zipBuffer = await githubLib.downloadArtifact(
+        githubRunId,
+        "app-release-aab",
+      );
+      const zip = new AdmZip(zipBuffer);
+      const aabEntry = zip
+        .getEntries()
+        .find((e) => e.entryName.endsWith(".aab"));
+      if (!aabEntry) {
+        const names = zip
+          .getEntries()
+          .map((e) => e.entryName)
+          .join(", ");
+        throw new Error(`Aucun .aab trouvé dans l'artifact GitHub (${names})`);
+      }
+      aabBuffer = aabEntry.getData();
+    } else {
+      throw new Error(
+        "AAB absent et githubRunId manquant. Impossible de récupérer le bundle Play Console.",
+      );
+    }
+
+    if (!aabBuffer || !Buffer.isBuffer(aabBuffer)) {
+      throw new Error("AAB invalide ou non trouvé dans l'artifact GitHub.");
+    }
+
     console.log(`[playstore-webhook] Starting upload for ${packageId}...`);
 
     const uploadResult = await playstoreLib.uploadAABToPlayConsole(
       packageId,
-      null, // aabPath sera null, on utilisera GitHub artifact
+      aabBuffer,
       credentials,
     );
 

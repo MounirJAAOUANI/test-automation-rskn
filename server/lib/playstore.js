@@ -51,39 +51,64 @@ function mockData(niche) {
  *
  * @param {string} packageId - ex: com.appfactory.savingbattle
  * @param {Buffer} aabBuffer - AAB file content
- * @param {string} credentialsJson - JSON string de GOOGLE_PLAY_CREDENTIALS
+ * @param {string|object} credentialsJson - JSON string or object from GOOGLE_PLAY_CREDENTIALS / GOOGLE_PLAY_SERVICE_ACCOUNT
  */
 async function uploadAABToPlayConsole(packageId, aabBuffer, credentialsJson) {
   try {
     console.log(`[uploadAABToPlayConsole] Démarrage upload pour ${packageId}`);
 
+    const rawCredentials =
+      credentialsJson ||
+      process.env.GOOGLE_PLAY_CREDENTIALS ||
+      process.env.GOOGLE_PLAY_SERVICE_ACCOUNT;
+
+    if (!rawCredentials) {
+      throw new Error(
+        "GOOGLE_PLAY_CREDENTIALS or GOOGLE_PLAY_SERVICE_ACCOUNT must be provided",
+      );
+    }
+
+    if (!aabBuffer || !Buffer.isBuffer(aabBuffer)) {
+      throw new Error(
+        "AAB buffer absent or invalid. Provide a valid Buffer containing the .aab file.",
+      );
+    }
+
     // ── 1. Parser les credentials ──
     let serviceAccount;
-    
-    if (typeof credentialsJson === "string") {
+
+    if (typeof rawCredentials === "string") {
       try {
-        serviceAccount = JSON.parse(credentialsJson);
+        serviceAccount = JSON.parse(rawCredentials);
       } catch (parseErr) {
-        throw new Error(`GOOGLE_PLAY_CREDENTIALS invalid JSON: ${parseErr.message}`);
+        throw new Error(
+          `Google Play service account JSON invalide: ${parseErr.message}`,
+        );
       }
-    } else if (typeof credentialsJson === "object") {
-      serviceAccount = credentialsJson;
+    } else if (typeof rawCredentials === "object") {
+      serviceAccount = rawCredentials;
     } else {
-      throw new Error("GOOGLE_PLAY_CREDENTIALS not provided or invalid type");
+      throw new Error("Google Play service account credentials invalid type");
     }
 
     if (!serviceAccount || !serviceAccount.client_email) {
-      throw new Error("GOOGLE_PLAY_CREDENTIALS missing required fields (client_email)");
+      throw new Error(
+        "GOOGLE_PLAY_CREDENTIALS missing required fields (client_email)",
+      );
     }
 
-    console.log(`[uploadAABToPlayConsole] Using service account: ${serviceAccount.client_email}`);
+    console.log(
+      `[uploadAABToPlayConsole] Using service account: ${serviceAccount.client_email}`,
+    );
 
     // ── 2. Créer auth Google ──
     let google;
     try {
       google = require("googleapis");
     } catch (e) {
-      throw new Error("googleapis package not installed. Run: npm install googleapis");
+      throw new Error(
+        "googleapis package not installed. Run: npm install googleapis",
+      );
     }
 
     const auth = new google.auth.GoogleAuth({
@@ -96,11 +121,24 @@ async function uploadAABToPlayConsole(packageId, aabBuffer, credentialsJson) {
       auth: auth,
     });
 
-    // ── 3. Upload le AAB ──
-    console.log(`[uploadAABToPlayConsole] Uploading ${(aabBuffer.length / 1024 / 1024).toFixed(1)} MB...`);
+    // ── 3. Créer un edit Play Console ──
+    const editRes = await androidpublisher.edits.insert({
+      packageName: packageId,
+    });
+    const editId = editRes.data.id;
+    if (!editId) {
+      throw new Error("Impossible de créer un edit Play Console");
+    }
+    console.log(`[uploadAABToPlayConsole] Created edit ${editId}`);
+
+    // ── 4. Upload le AAB ──
+    console.log(
+      `[uploadAABToPlayConsole] Uploading ${(aabBuffer.length / 1024 / 1024).toFixed(1)} MB...`,
+    );
 
     const uploadResponse = await androidpublisher.edits.bundles.upload({
       packageName: packageId,
+      editId,
       media: {
         mimeType: "application/octet-stream",
         body: aabBuffer,
@@ -108,16 +146,44 @@ async function uploadAABToPlayConsole(packageId, aabBuffer, credentialsJson) {
     });
 
     const versionCode = uploadResponse.data.versionCode;
+    if (!versionCode) {
+      throw new Error("Impossible de récupérer versionCode après upload AAB");
+    }
     console.log(`✅ AAB uploadé avec succès: versionCode ${versionCode}`);
+
+    // ── 5. Mettre la track interne en brouillon ──
+    await androidpublisher.edits.tracks.update({
+      packageName: packageId,
+      editId,
+      track: "internal",
+      requestBody: {
+        releases: [
+          {
+            status: "draft",
+            versionCodes: [versionCode],
+          },
+        ],
+      },
+    });
+
+    // ── 6. Commit de l'edit ──
+    const commitResponse = await androidpublisher.edits.commit({
+      packageName: packageId,
+      editId,
+      changesNotSentForReview: false,
+    });
+
+    const draftUrl = `https://play.google.com/console/u/0/developers/123456/app/${packageId}/internal-testing`; // renseigné à titre indicatif
 
     return {
       success: true,
       versionCode,
+      editId,
       size: aabBuffer.length,
       message: `AAB uploadé à Play Console (versionCode: ${versionCode})`,
-      url: `https://play.google.com/console/u/0/developers/123456/app/${packageId}/tracks/production`,
+      url: draftUrl,
+      draftUrl,
     };
-
   } catch (err) {
     console.error(`❌ Play Console upload error: ${err.message}`);
     throw err;
@@ -127,9 +193,15 @@ async function uploadAABToPlayConsole(packageId, aabBuffer, credentialsJson) {
 /**
  * Soumettre l'app pour review (future)
  */
-async function submitAppForReview(packageId, credentialsJson, trackName = "internal") {
+async function submitAppForReview(
+  packageId,
+  credentialsJson,
+  trackName = "internal",
+) {
   try {
-    console.log(`[submitAppForReview] Submission de ${packageId} à la track ${trackName}`);
+    console.log(
+      `[submitAppForReview] Submission de ${packageId} à la track ${trackName}`,
+    );
 
     let serviceAccount;
     if (typeof credentialsJson === "string") {
@@ -178,7 +250,6 @@ async function submitAppForReview(packageId, credentialsJson, trackName = "inter
       editId: commitResponse.data.id,
       message: `App soumise à ${trackName}`,
     };
-
   } catch (err) {
     console.error(`❌ App submission error: ${err.message}`);
     throw err;

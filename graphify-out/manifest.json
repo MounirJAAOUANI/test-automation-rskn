@@ -1,0 +1,472 @@
+{
+  "D:\\VS Projects\\test-automation-rskn\\android\\app\\build.gradle": {
+    "mtime": 1780131066.4608004,
+    "ast_hash": "5e9eb87d591e94dd69c406afe8e46274",
+    "semantic_hash": "5e9eb87d591e94dd69c406afe8e46274"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\package.json": {
+    "mtime": 1780255243.7163503,
+    "ast_hash": "33899054464aa2f2570e159cc399328c",
+    "semantic_hash": "33899054464aa2f2570e159cc399328c"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\src\\App.jsx": {
+    "mtime": 1781175669.0929103,
+    "ast_hash": "266d29b5b8cd68682832e166bd98b228",
+    "semantic_hash": "266d29b5b8cd68682832e166bd98b228"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\src\\api.js": {
+    "mtime": 1780518609.1211674,
+    "ast_hash": "45b8aac9f2512596671e6d3d64b62622",
+    "semantic_hash": "45b8aac9f2512596671e6d3d64b62622"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\src\\components\\LogTerminal.jsx": {
+    "mtime": 1780067352.4024985,
+    "ast_hash": "05d3d8593f0d0ad8c447958541344cf0",
+    "semantic_hash": "05d3d8593f0d0ad8c447958541344cf0"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\src\\components\\PasswordModal.jsx": {
+    "mtime": 1780067352.4060993,
+    "ast_hash": "b9d3f6cfa8a4b94822d1af25b253bd51",
+    "semantic_hash": "b9d3f6cfa8a4b94822d1af25b253bd51"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\src\\components\\PrereqPanel.jsx": {
+    "mtime": 1780067352.4178965,
+    "ast_hash": "6e23671e1e89908ec14fc3b2ee10cb77",
+    "semantic_hash": "6e23671e1e89908ec14fc3b2ee10cb77"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\src\\components\\StepCard.jsx": {
+    "mtime": 1780067352.392709,
+    "ast_hash": "0491a615cc560707c770d3e6bc412a60",
+    "semantic_hash": "0491a615cc560707c770d3e6bc412a60"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\src\\config.js": {
+    "mtime": 1780067352.3754003,
+    "ast_hash": "96b508ef99f422f206f2144e34934b50",
+    "semantic_hash": "96b508ef99f422f206f2144e34934b50"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\src\\main.jsx": {
+    "mtime": 1780067352.384174,
+    "ast_hash": "b892d5f1acfa3e95b4ead465c885fa65",
+    "semantic_hash": "b892d5f1acfa3e95b4ead465c885fa65"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\src\\steps\\index.js": {
+    "mtime": 1780067352.463657,
+    "ast_hash": "3c4e87d0e3588d8877304e145b7ffc0a",
+    "semantic_hash": "3c4e87d0e3588d8877304e145b7ffc0a"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\vite.config.js": {
+    "mtime": 1780067352.4726,
+    "ast_hash": "ebb41088b51b96d8ee812bd21dc2e92e",
+    "semantic_hash": "ebb41088b51b96d8ee812bd21dc2e92e"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\eslint.config.js": {
+    "mtime": 1779717790.4545515,
+    "ast_hash": "0355276bc79439afe3c53e3a2470ca1e",
+    "semantic_hash": "0355276bc79439afe3c53e3a2470ca1e"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\lib\\main.dart": {
+    "mtime": 1780132145.6776712,
+    "ast_hash": "b25d2916f06f2700c02de714e7e13d06",
+    "semantic_hash": "b25d2916f06f2700c02de714e7e13d06"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\package.json": {
+    "mtime": 1780251054.7422009,
+    "ast_hash": "8fce626d4a69316d88c7adb90e05f4c2",
+    "semantic_hash": "8fce626d4a69316d88c7adb90e05f4c2"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\server\\index.js": {
+    "mtime": 1781202275.5583372,
+    "ast_hash": "ad45b02d831f9c1c1c68626118f2d136",
+    "semantic_hash": "ad45b02d831f9c1c1c68626118f2d136"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\server\\lib\\claude.js": {
+    "mtime": 1780067352.2823045,
+    "ast_hash": "e77e43b4631b0f4f07cd2a3d52566d43",
+    "semantic_hash": "e77e43b4631b0f4f07cd2a3d52566d43"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\server\\lib\\firebase.js": {
+    "mtime": 1780267165.237879,
+    "ast_hash": "9ed71da2593432efd98b59623b451a5a",
+    "semantic_hash": "9ed71da2593432efd98b59623b451a5a"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\server\\lib\\github-poller.js": {
+    "mtime": 1780519052.1714468,
+    "ast_hash": "3ff0fa7b7fa08b0870609c616c378f14",
+    "semantic_hash": "3ff0fa7b7fa08b0870609c616c378f14"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\server\\lib\\github.js": {
+    "mtime": 1780267196.5455174,
+    "ast_hash": "234855391b9d1db0688990e1001bde6d",
+    "semantic_hash": "234855391b9d1db0688990e1001bde6d"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\server\\lib\\jobQueue.js": {
+    "mtime": 1781132128.1680994,
+    "ast_hash": "beadd442ae71db7c90b79efaf0a6c852",
+    "semantic_hash": "beadd442ae71db7c90b79efaf0a6c852"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\server\\lib\\openai.js": {
+    "mtime": 1780095750.0966177,
+    "ast_hash": "4085a2420cb02cd6887d13a2da18c150",
+    "semantic_hash": "4085a2420cb02cd6887d13a2da18c150"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\server\\lib\\playstore.js": {
+    "mtime": 1781174556.7407682,
+    "ast_hash": "f5547f1b120eebeeed440bef28675fce",
+    "semantic_hash": "f5547f1b120eebeeed440bef28675fce"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\server\\lib\\privacypolicy.js": {
+    "mtime": 1780132208.6614206,
+    "ast_hash": "eb42a22c044938d0d1020d0b2ab6dbdd",
+    "semantic_hash": "eb42a22c044938d0d1020d0b2ab6dbdd"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\server\\package.json": {
+    "mtime": 1781174639.4285953,
+    "ast_hash": "5f7edfcab9f87d50f1462cd0acad4139",
+    "semantic_hash": "5f7edfcab9f87d50f1462cd0acad4139"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\tsconfig.app.json": {
+    "mtime": 1780073562.552781,
+    "ast_hash": "7741bbd8a604073968ba01eeaa4074ea",
+    "semantic_hash": "7741bbd8a604073968ba01eeaa4074ea"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\tsconfig.json": {
+    "mtime": 1779994421.7735558,
+    "ast_hash": "5ac5a944011c860340d07a920239e1a2",
+    "semantic_hash": "5ac5a944011c860340d07a920239e1a2"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\tsconfig.node.json": {
+    "mtime": 1779717790.5259984,
+    "ast_hash": "70bdd0a673bcfc0e828080b306e7c680",
+    "semantic_hash": "70bdd0a673bcfc0e828080b306e7c680"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\vite.config.ts": {
+    "mtime": 1779994461.5648556,
+    "ast_hash": "1893e48fbf6c8216b3c55f71c31282d0",
+    "semantic_hash": "1893e48fbf6c8216b3c55f71c31282d0"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\.github\\workflows\\build.yml": {
+    "mtime": 1781201517.7919793,
+    "ast_hash": "b1be218d8755301698fb70ed2a0b0eec",
+    "semantic_hash": "b1be218d8755301698fb70ed2a0b0eec"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\.github\\workflows\\cleanup-artifacts.yml": {
+    "mtime": 1781175130.7571309,
+    "ast_hash": "0ac5c23a41d6dd95cf72990b9aabdae3",
+    "semantic_hash": "0ac5c23a41d6dd95cf72990b9aabdae3"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\DEBUG.html": {
+    "mtime": 1780592124.5337753,
+    "ast_hash": "feb593e1501721f9e3dfef9d4740df5b",
+    "semantic_hash": "feb593e1501721f9e3dfef9d4740df5b"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\README.md": {
+    "mtime": 1780067352.262429,
+    "ast_hash": "b56f55f17061d29ab75ce2ac80287a7c",
+    "semantic_hash": "b56f55f17061d29ab75ce2ac80287a7c"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\DEBUG.html": {
+    "mtime": 1780592124.5337753,
+    "ast_hash": "feb593e1501721f9e3dfef9d4740df5b",
+    "semantic_hash": "feb593e1501721f9e3dfef9d4740df5b"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\index.html": {
+    "mtime": 1780067352.4848113,
+    "ast_hash": "ae40e9dc6475b75e6fb3562532da0297",
+    "semantic_hash": "ae40e9dc6475b75e6fb3562532da0297"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\client\\src\\DEBUG.html": {
+    "mtime": 1780592124.5337753,
+    "ast_hash": "feb593e1501721f9e3dfef9d4740df5b",
+    "semantic_hash": "feb593e1501721f9e3dfef9d4740df5b"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\com-appfactory-procount-privacy.html": {
+    "mtime": 1780426519.9902124,
+    "ast_hash": "d75c0fa4e65ce772cd8fa30ef0c3e254",
+    "semantic_hash": "d75c0fa4e65ce772cd8fa30ef0c3e254"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\com-appfactory-snapspend-privacy.html": {
+    "mtime": 1780426513.7429903,
+    "ast_hash": "473454c1bc0d6305f38cdc49b66f1161",
+    "semantic_hash": "473454c1bc0d6305f38cdc49b66f1161"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\index.html": {
+    "mtime": 1779717823.2856832,
+    "ast_hash": "33db5b8af7eb42095d69ac0417ad036e",
+    "semantic_hash": "33db5b8af7eb42095d69ac0417ad036e"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-clearmind-privacy.html": {
+    "mtime": 1780230985.2725444,
+    "ast_hash": "8034eb5ee6fba35d6b7f1d7ab28bab18",
+    "semantic_hash": "8034eb5ee6fba35d6b7f1d7ab28bab18"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-dotify-privacy.html": {
+    "mtime": 1781132221.1980958,
+    "ast_hash": "7e8b9c2441de5b9b83f002c53a0ef20b",
+    "semantic_hash": "7e8b9c2441de5b9b83f002c53a0ef20b"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-duobudget-privacy.html": {
+    "mtime": 1780421693.2583396,
+    "ast_hash": "8876b0a149e84949cf720edcb1e76c3b",
+    "semantic_hash": "8876b0a149e84949cf720edcb1e76c3b"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-familypurse-privacy.html": {
+    "mtime": 1780102407.3867748,
+    "ast_hash": "798e0b727c56d87eeb0aa2b376db1219",
+    "semantic_hash": "798e0b727c56d87eeb0aa2b376db1219"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-famvault-privacy.html": {
+    "mtime": 1781132221.210094,
+    "ast_hash": "d1de2a025da47f034c138398896b1153",
+    "semantic_hash": "d1de2a025da47f034c138398896b1153"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-finflow-privacy.html": {
+    "mtime": 1780421693.2693212,
+    "ast_hash": "185c10adf550496577c7c2683f0d1988",
+    "semantic_hash": "185c10adf550496577c7c2683f0d1988"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-fiscalai-privacy.html": {
+    "mtime": 1780100684.1168592,
+    "ast_hash": "e52c65d82b59b1364fb479ee9b2a8a29",
+    "semantic_hash": "e52c65d82b59b1364fb479ee9b2a8a29"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-fiscalflow-privacy.html": {
+    "mtime": 1780254940.2425117,
+    "ast_hash": "992c784f986c3a177d72ed71facea044",
+    "semantic_hash": "992c784f986c3a177d72ed71facea044"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-flowbudget-privacy.html": {
+    "mtime": 1780254940.2425117,
+    "ast_hash": "fac9945138ea9bc36829b744efedbd64",
+    "semantic_hash": "fac9945138ea9bc36829b744efedbd64"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-flowfreelance-privacy.html": {
+    "mtime": 1780594679.9116688,
+    "ast_hash": "f2f64aa3109b5f55fb5c0f5d6cd3645b",
+    "semantic_hash": "f2f64aa3109b5f55fb5c0f5d6cd3645b"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-flowsync-privacy.html": {
+    "mtime": 1780785944.263282,
+    "ast_hash": "4a3a18271fa2715e4d96e6e452d16827",
+    "semantic_hash": "4a3a18271fa2715e4d96e6e452d16827"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-freelanceflow-privacy.html": {
+    "mtime": 1781132221.2110932,
+    "ast_hash": "46976d53ceb9401906b4022c7707dec1",
+    "semantic_hash": "46976d53ceb9401906b4022c7707dec1"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-freeledger-privacy.html": {
+    "mtime": 1780170088.5709052,
+    "ast_hash": "69b88751ce8a302a44826874e8989d69",
+    "semantic_hash": "69b88751ce8a302a44826874e8989d69"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-habit-privacy.html": {
+    "mtime": 1780785944.2777946,
+    "ast_hash": "689b0cc0226d9f9c9f34eb6bd13e3eed",
+    "semantic_hash": "689b0cc0226d9f9c9f34eb6bd13e3eed"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-habitmin-privacy.html": {
+    "mtime": 1780421693.2918923,
+    "ast_hash": "b8d4253009ad45387a871efa6ceb63b8",
+    "semantic_hash": "b8d4253009ad45387a871efa6ceb63b8"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-intentio-privacy.html": {
+    "mtime": 1780432404.91257,
+    "ast_hash": "443793c6666eecb648a8dfd9296d23cf",
+    "semantic_hash": "443793c6666eecb648a8dfd9296d23cf"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-invoiceflow-privacy.html": {
+    "mtime": 1780514851.2256737,
+    "ast_hash": "dec41645f68d007b70a607118d5a037b",
+    "semantic_hash": "dec41645f68d007b70a607118d5a037b"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-memepro-privacy.html": {
+    "mtime": 1780170088.5729163,
+    "ast_hash": "bfc86acb668c1fff8bef3a4867415a44",
+    "semantic_hash": "bfc86acb668c1fff8bef3a4867415a44"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-microflow-privacy.html": {
+    "mtime": 1780436574.7363074,
+    "ast_hash": "d5b984ca4e9d7fcfeb7e1c76b5b3b440",
+    "semantic_hash": "d5b984ca4e9d7fcfeb7e1c76b5b3b440"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-piggy-privacy.html": {
+    "mtime": 1780182351.0366395,
+    "ast_hash": "bd0e8ad765771ca63150f94dfd887937",
+    "semantic_hash": "bd0e8ad765771ca63150f94dfd887937"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-pincer-privacy.html": {
+    "mtime": 1780441657.3939843,
+    "ast_hash": "2940aca3a31aa00527319831cdc3c072",
+    "semantic_hash": "2940aca3a31aa00527319831cdc3c072"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-pingoai-privacy.html": {
+    "mtime": 1780595094.7680333,
+    "ast_hash": "942e6b0577e65f6fdcf66af383d63f1a",
+    "semantic_hash": "942e6b0577e65f6fdcf66af383d63f1a"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-pulse-privacy.html": {
+    "mtime": 1780518796.265906,
+    "ast_hash": "0a961d1f19540c3090d375dbc17bc115",
+    "semantic_hash": "0a961d1f19540c3090d375dbc17bc115"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-savingbattle-privacy.html": {
+    "mtime": 1781175549.2834315,
+    "ast_hash": "0ba9c5de11052685cd000de2308b36cc",
+    "semantic_hash": "0ba9c5de11052685cd000de2308b36cc"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-savingquest-privacy.html": {
+    "mtime": 1781178265.703539,
+    "ast_hash": "0eea154a5bd70ae3ece1e12424fbe6c0",
+    "semantic_hash": "0eea154a5bd70ae3ece1e12424fbe6c0"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-savvyai-privacy.html": {
+    "mtime": 1780520892.748271,
+    "ast_hash": "e91a8bdd05d52dd5eda1da884f2e7efe",
+    "semantic_hash": "e91a8bdd05d52dd5eda1da884f2e7efe"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-savvysync-privacy.html": {
+    "mtime": 1780592319.2796967,
+    "ast_hash": "5b5c71c9e03ab364816e3ecb755eb180",
+    "semantic_hash": "5b5c71c9e03ab364816e3ecb755eb180"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-smartspend-privacy.html": {
+    "mtime": 1780514851.2434745,
+    "ast_hash": "d24a3521661ccb20ca7ee92db2bcf1d1",
+    "semantic_hash": "d24a3521661ccb20ca7ee92db2bcf1d1"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-snapbudget-privacy.html": {
+    "mtime": 1780785944.3109725,
+    "ast_hash": "b8cc7af648bbdac2fa9ca7d104059782",
+    "semantic_hash": "b8cc7af648bbdac2fa9ca7d104059782"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-soloflow-privacy.html": {
+    "mtime": 1781132221.222095,
+    "ast_hash": "ba2d93b565767e5c957ef918c7ae5358",
+    "semantic_hash": "ba2d93b565767e5c957ef918c7ae5358"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-spendai-privacy.html": {
+    "mtime": 1780514851.2717614,
+    "ast_hash": "77f461cfe2e3419760513b23d74bc655",
+    "semantic_hash": "77f461cfe2e3419760513b23d74bc655"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-spendflow-privacy.html": {
+    "mtime": 1780154074.1101892,
+    "ast_hash": "8cdfb1033f1c8ab8a93536c207fce7fd",
+    "semantic_hash": "8cdfb1033f1c8ab8a93536c207fce7fd"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-spendless-privacy.html": {
+    "mtime": 1781176423.6402073,
+    "ast_hash": "c50a1ce6275bdf278777a0be2a2a0044",
+    "semantic_hash": "c50a1ce6275bdf278777a0be2a2a0044"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-spendmind-privacy.html": {
+    "mtime": 1780470418.5607326,
+    "ast_hash": "db8b8195486fbcbb01cd3a77fa7b41fe",
+    "semantic_hash": "db8b8195486fbcbb01cd3a77fa7b41fe"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-spendquest-privacy.html": {
+    "mtime": 1780224736.0344763,
+    "ast_hash": "df5933358e3a49bd141b9295d15d84ec",
+    "semantic_hash": "df5933358e3a49bd141b9295d15d84ec"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-spendsense-privacy.html": {
+    "mtime": 1780132745.1697075,
+    "ast_hash": "19d538ae79d0586e912ce3e532979071",
+    "semantic_hash": "19d538ae79d0586e912ce3e532979071"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-spendwise-privacy.html": {
+    "mtime": 1780245546.1791532,
+    "ast_hash": "992f9498dea08c875294ec5413f5700d",
+    "semantic_hash": "992f9498dea08c875294ec5413f5700d"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-spliteasy-privacy.html": {
+    "mtime": 1780253183.485785,
+    "ast_hash": "2e6b08a876cac5ad95533eb40d00b70b",
+    "semantic_hash": "2e6b08a876cac5ad95533eb40d00b70b"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-splitflow-privacy.html": {
+    "mtime": 1780101603.1347334,
+    "ast_hash": "5ea70d65c3df3c23dbf1c6a7573c6e4d",
+    "semantic_hash": "5ea70d65c3df3c23dbf1c6a7573c6e4d"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-splitmate-privacy.html": {
+    "mtime": 1780181058.1594765,
+    "ast_hash": "e4736a5a779ba28d5fced9fef04d4ad1",
+    "semantic_hash": "e4736a5a779ba28d5fced9fef04d4ad1"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-splitwiseai-privacy.html": {
+    "mtime": 1780247769.6479015,
+    "ast_hash": "888517261be1b587219df62fd7b06c13",
+    "semantic_hash": "888517261be1b587219df62fd7b06c13"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-streak-privacy.html": {
+    "mtime": 1781132221.2431097,
+    "ast_hash": "787ae3251ed20ecaa4cd3447fcd9c1b9",
+    "semantic_hash": "787ae3251ed20ecaa4cd3447fcd9c1b9"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-synced-privacy.html": {
+    "mtime": 1780517333.0348403,
+    "ast_hash": "ddbd6a0dd1acef1d7951f63df7984504",
+    "semantic_hash": "ddbd6a0dd1acef1d7951f63df7984504"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-synergispend-privacy.html": {
+    "mtime": 1780515647.870755,
+    "ast_hash": "61e8b1b8c8a4bfd82a00976cf1261027",
+    "semantic_hash": "61e8b1b8c8a4bfd82a00976cf1261027"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-thriftai-privacy.html": {
+    "mtime": 1780785944.331717,
+    "ast_hash": "e63c6be7615eee0b2d2dd69193fdbb5c",
+    "semantic_hash": "e63c6be7615eee0b2d2dd69193fdbb5c"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-thrive-privacy.html": {
+    "mtime": 1780138770.4618824,
+    "ast_hash": "6ae73029ab896ad5d276cd936f84fbf1",
+    "semantic_hash": "6ae73029ab896ad5d276cd936f84fbf1"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-trace-privacy.html": {
+    "mtime": 1780421693.3537233,
+    "ast_hash": "8d9d91707c34d65c0f3c2bcbec7ec02e",
+    "semantic_hash": "8d9d91707c34d65c0f3c2bcbec7ec02e"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-walletmind-privacy.html": {
+    "mtime": 1780517333.0358381,
+    "ast_hash": "166456a309f1bd4e16a5fd6b9e3ebf12",
+    "semantic_hash": "166456a309f1bd4e16a5fd6b9e3ebf12"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-walletwise-privacy.html": {
+    "mtime": 1780421693.3697915,
+    "ast_hash": "8d51c510fcad9c6303a7164fc9537d89",
+    "semantic_hash": "8d51c510fcad9c6303a7164fc9537d89"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\policies\\com-appfactory-wealthflow-privacy.html": {
+    "mtime": 1780134493.5367265,
+    "ast_hash": "706d9044a9c870ab38f810a2d28280da",
+    "semantic_hash": "706d9044a9c870ab38f810a2d28280da"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\public\\DEBUG.html": {
+    "mtime": 1780592124.5337753,
+    "ast_hash": "feb593e1501721f9e3dfef9d4740df5b",
+    "semantic_hash": "feb593e1501721f9e3dfef9d4740df5b"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\pubspec.yaml": {
+    "mtime": 1780132184.5286932,
+    "ast_hash": "b13288ec2ca9e6346df314b8d08ecd55",
+    "semantic_hash": "b13288ec2ca9e6346df314b8d08ecd55"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\server\\public\\DEBUG.html": {
+    "mtime": 1780592124.5337753,
+    "ast_hash": "feb593e1501721f9e3dfef9d4740df5b",
+    "semantic_hash": "feb593e1501721f9e3dfef9d4740df5b"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\public\\favicon.svg": {
+    "mtime": 1779717790.60518,
+    "ast_hash": "7e840862161341271697daa99a40d76b",
+    "semantic_hash": "7e840862161341271697daa99a40d76b"
+  },
+  "D:\\VS Projects\\test-automation-rskn\\public\\icons.svg": {
+    "mtime": 1779717790.632068,
+    "ast_hash": "3b4fcfcf393eca4d264dca4a4663bc37",
+    "semantic_hash": "3b4fcfcf393eca4d264dca4a4663bc37"
+  }
+}
